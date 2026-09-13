@@ -516,12 +516,12 @@ export default function BackgroundImageSettings({
           <p className="text-zinc-400 text-xs mb-3">
             Images you uploaded at{' '}
             <a
-              href="https://snap.cephie.app"
+              href="https://cephie.app/media"
               target="_blank"
               rel="noopener noreferrer"
               className="text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1"
             >
-              snap.cephie.app
+              cephie.app/media
               <ExternalLink className="h-3 w-3" />
             </a>{' '}
             - select one as your background.
@@ -540,12 +540,12 @@ export default function BackgroundImageSettings({
                 No Cephie Snap pictures yet.
               </p>
               <a
-                href="https://snap.cephie.app"
+                href="https://cephie.app/media"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-cyan-400 hover:text-cyan-300 text-sm inline-flex items-center gap-1 mt-2"
               >
-                Upload at snap.cephie.app
+                Upload at cephie.app/media
                 <ExternalLink className="h-3 w-3" />
               </a>
             </div>
