@@ -223,7 +223,7 @@ export function ChatTextComposer({
 
           <textarea
             ref={textareaRef}
-            className="block w-full bg-zinc-800 text-white px-4 py-2 pr-14 rounded-3xl border border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="block w-full bg-zinc-800 text-white px-4 py-2 pr-14 rounded-3xl border border-blue-700 focus:outline-none focus:border-blue-500 resize-none"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}

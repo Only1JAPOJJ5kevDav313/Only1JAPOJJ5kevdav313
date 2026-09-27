@@ -572,7 +572,7 @@ export default function MyFlightDetail() {
                 placeholder="Add notes about this flight..."
                 rows={7}
                 maxLength={2000}
-                className="w-full bg-zinc-800/40 border border-zinc-800 rounded-2xl p-4 text-sm text-zinc-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/30 placeholder-zinc-600 transition-all"
+                className="w-full bg-zinc-800/40 border border-zinc-800 rounded-2xl p-4 text-sm text-zinc-200 font-mono resize-none focus:outline-none focus:border-blue-500 placeholder-zinc-600 transition-all"
               />
               <p className="text-right text-xs font-mono text-zinc-700 mt-1.5">
                 {notes.length}/2000

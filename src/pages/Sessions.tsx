@@ -1,53 +1,218 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import Navbar from '../components/Navbar';
 import {
-  Workflow,
-  Calendar,
-  Plane,
   AlertTriangle,
-  Pencil,
-  Trash2,
-  Info,
-  X,
-  PlaneTakeoff,
+  Calendar,
   FolderOpen,
+  Hash,
+  Info,
+  Loader2,
+  Pencil,
+  Plane,
+  PlaneTakeoff,
+  Plus,
+  Search,
+  Trash2,
+  Workflow,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import Navbar from '../components/Navbar';
+import PageHero from '../components/common/PageHero';
+import SessionTypeLabel from '../components/common/SessionTypeLabel';
 import { useAuth } from '../hooks/auth/useAuth';
-import { useSettings } from '../hooks/settings/useSettings';
 import {
   fetchMySessions,
   updateSessionName,
   deleteSession,
 } from '../utils/fetch/sessions';
 import type { SessionInfo } from '../types/session';
-import { fetchBackgrounds } from '../utils/fetch/data';
-import Button from '../components/common/Button';
-import TextInput from '../components/common/TextInput';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
+const sessionName = (session: SessionInfo | null) =>
+  session?.customName || `${session?.airportIcao || 'Unknown'} Session`;
 
-interface AvailableImage {
-  filename: string;
-  path: string;
-  extension: string;
+function CountLabel({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-sm font-medium text-zinc-200 tabular-nums [&_svg]:size-4 [&_svg]:text-blue-400">
+      {icon}
+      {children}
+    </div>
+  );
+}
+
+function SessionCardSkeleton() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-3xl border-2 border-zinc-800 bg-zinc-900">
+      <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+        <Skeleton className="size-5 rounded-md" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <div className="flex flex-col gap-3 px-5 pb-4">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-3.5 w-44" />
+        <Skeleton className="h-3.5 w-32" />
+      </div>
+      <div className="flex items-center justify-between px-5 pb-4">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-3.5 w-16" />
+      </div>
+    </div>
+  );
+}
+
+function SessionCard({
+  session,
+  onRename,
+  onDelete,
+}: {
+  session: SessionInfo;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="relative">
+      <Link
+        to={`/view/${session.sessionId}/?accessId=${session.accessId}`}
+        className="flex h-full flex-col overflow-hidden rounded-3xl border-2 border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-700 hover:bg-zinc-800/60"
+      >
+        <div className="flex min-w-0 items-center gap-3 pt-4 pr-36 pb-3 pl-5">
+          <FolderOpen className="size-5 shrink-0 text-blue-400" />
+          <span className="truncate font-medium">{sessionName(session)}</span>
+          {session.isLegacy && (
+            <Info
+              aria-label="Legacy session"
+              className="size-4 shrink-0 text-amber-400"
+            />
+          )}
+        </div>
+        <div className="flex flex-1 flex-col gap-2.5 px-5 pb-4 text-sm text-zinc-300 [&_svg]:text-zinc-500">
+          <span className="flex min-w-0 items-center gap-2">
+            <Hash className="size-4 shrink-0" />
+            <span className="truncate font-mono">{session.sessionId}</span>
+          </span>
+          <span className="flex items-center gap-2">
+            <Calendar className="size-4 shrink-0" />
+            {session.createdAt
+              ? new Date(session.createdAt).toLocaleString()
+              : 'Date unavailable'}
+          </span>
+          {session.activeRunway && (
+            <span className="flex items-center gap-2">
+              <PlaneTakeoff className="size-4 shrink-0" />
+              Departure runway
+              <span className="font-mono font-medium text-foreground">
+                {session.activeRunway}
+              </span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 px-5 pb-4">
+          <SessionTypeLabel
+            isAdvancedATC={session.isAdvancedATC}
+            isPFATC={session.isPFATC}
+          />
+          <span className="flex items-center gap-1.5 text-sm text-zinc-300 tabular-nums [&_svg]:text-zinc-500">
+            <Plane className="size-4" />
+            {session.flightCount}{' '}
+            {session.flightCount === 1 ? 'flight' : 'flights'}
+          </span>
+        </div>
+      </Link>
+      <div className="absolute top-3 right-3 flex gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="border-2 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-blue-600"
+          onClick={onRename}
+        >
+          <Pencil />
+          Edit
+        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete session"
+              className="border-2 border-red-600 text-red-400 hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-red-600"
+              onClick={onDelete}
+            >
+              <Trash2 />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="shadcn-scope" sideOffset={6}>
+            Delete session
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  );
 }
 
 export default function Sessions() {
   const { user, isLoading } = useAuth();
-  const { settings } = useSettings();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingName, setEditingName] = useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = useState<SessionInfo | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
-  const [savingName, setSavingName] = useState<string | null>(null);
-  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [deleteInProgress, setDeleteInProgress] = useState<string | null>(null);
-  const [availableImages, setAvailableImages] = useState<AvailableImage[]>([]);
-  const [customLoaded, setCustomLoaded] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SessionInfo | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [query, setQuery] = useState('');
 
   const maxSessions = user?.isAdmin || user?.isTester ? 100 : 50;
+  const atLimit = sessions.length >= maxSessions;
+
+  const filteredSessions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sessions;
+    return sessions.filter((session) =>
+      [
+        sessionName(session),
+        session.sessionId,
+        session.airportIcao,
+        session.activeRunway,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q))
+    );
+  }, [sessions, query]);
 
   useEffect(() => {
     if (!user) {
@@ -55,551 +220,306 @@ export default function Sessions() {
       return;
     }
     fetchMySessions()
-      .then((data) => {
-        setSessions(data);
-      })
+      .then(setSessions)
       .catch(() => setError('Failed to load sessions.'))
       .finally(() => setLoading(false));
   }, [user]);
 
-  useEffect(() => {
-    const loadImages = async () => {
-      try {
-        const data = await fetchBackgrounds();
-        setAvailableImages(data);
-      } catch (error) {
-        console.error('Error loading available images:', error);
-      }
-    };
-    loadImages();
-  }, []);
-
-  const backgroundImage = useMemo(() => {
-    const selectedImage = settings?.backgroundImage?.selectedImage;
-    let bgImage = 'url("/assets/images/hero.webp")';
-
-    const getImageUrl = (filename: string | null): string | null => {
-      if (!filename || filename === 'random' || filename === 'favorites') {
-        return filename;
-      }
-      if (filename.startsWith('https://api.cephie.app/')) {
-        return filename;
-      }
-      return `${API_BASE_URL}/assets/app/backgrounds/${filename}`;
-    };
-
-    if (selectedImage === 'random') {
-      if (availableImages.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableImages.length);
-        bgImage = `url(${API_BASE_URL}${availableImages[randomIndex].path})`;
-      }
-    } else if (selectedImage === 'favorites') {
-      const favorites = settings?.backgroundImage?.favorites || [];
-      if (favorites.length > 0) {
-        const randomFav =
-          favorites[Math.floor(Math.random() * favorites.length)];
-        const favImageUrl = getImageUrl(randomFav);
-        if (
-          favImageUrl &&
-          favImageUrl !== 'random' &&
-          favImageUrl !== 'favorites'
-        ) {
-          bgImage = `url(${favImageUrl})`;
-        }
-      }
-    } else if (selectedImage) {
-      const imageUrl = getImageUrl(selectedImage);
-      if (imageUrl && imageUrl !== 'random' && imageUrl !== 'favorites') {
-        bgImage = `url(${imageUrl})`;
-      }
-    }
-
-    return bgImage;
-  }, [
-    settings?.backgroundImage?.selectedImage,
-    settings?.backgroundImage?.favorites,
-    availableImages,
-  ]);
-
-  useEffect(() => {
-    if (backgroundImage !== 'url("/assets/images/hero.webp")') {
-      setCustomLoaded(true);
-    }
-  }, [backgroundImage]);
-
-  const startEditingName = (sessionId: string, currentName: string) => {
-    setEditingName(sessionId);
-    setEditNameValue(currentName || '');
+  const openRename = (session: SessionInfo) => {
+    setRenameTarget(session);
+    setEditNameValue(session.customName || '');
+    setRenameOpen(true);
   };
 
-  const saveSessionName = async (sessionId: string) => {
-    if (!editNameValue.trim()) {
-      setEditingName(null);
-      setEditNameValue('');
+  const saveSessionName = async () => {
+    if (!renameTarget) return;
+    const name = editNameValue.trim();
+    if (!name) {
+      setRenameOpen(false);
       return;
     }
-    setSavingName(sessionId);
+    setSavingName(true);
     try {
       const { customName } = await updateSessionName(
-        sessionId,
-        editNameValue.trim()
+        renameTarget.sessionId,
+        name
       );
       setSessions((prev) =>
-        prev.map((s) => (s.sessionId === sessionId ? { ...s, customName } : s))
+        prev.map((s) =>
+          s.sessionId === renameTarget.sessionId ? { ...s, customName } : s
+        )
       );
-      setEditingName(null);
-      setEditNameValue('');
+      setRenameOpen(false);
     } catch {
-      setError('Failed to update session name.');
+      toast.error('Failed to update session name.');
     } finally {
-      setSavingName(null);
+      setSavingName(false);
     }
   };
 
-  const confirmDelete = (sessionId: string) => {
-    setSessionToDelete(sessionId);
+  const openDelete = (session: SessionInfo) => {
+    setDeleteTarget(session);
+    setDeleteOpen(true);
   };
 
   const handleDeleteSession = async () => {
-    if (!sessionToDelete) return;
-    setDeleteInProgress(sessionToDelete);
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteSession(sessionToDelete);
+      await deleteSession(deleteTarget.sessionId);
       setSessions((prev) =>
-        prev.filter((s) => s.sessionId !== sessionToDelete)
+        prev.filter((s) => s.sessionId !== deleteTarget.sessionId)
       );
-      setSessionToDelete(null);
+      setDeleteOpen(false);
     } catch {
-      setError('Failed to delete session.');
+      toast.error('Failed to delete session.');
     } finally {
-      setDeleteInProgress(null);
+      setDeleting(false);
     }
   };
 
-  if (isLoading || loading) {
+  if (!isLoading && !loading && !user) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white relative">
+      <div className="shadcn-scope flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
         <Navbar />
-        <div className="relative w-full h-80 md:h-96 overflow-hidden">
-          <div className="absolute inset-0">
-            <img
-              src="/assets/images/hero.webp"
-              alt="Banner"
-              className="object-cover w-full h-full scale-110"
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                opacity: customLoaded ? 1 : 0,
-                transition: 'opacity 0.5s ease-in-out',
-              }}
-            />
-            <div className="absolute inset-0 bg-linear-to-b from-zinc-950/40 via-zinc-950/70 to-zinc-950" />
+        <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-3xl border-2 border-zinc-800 bg-zinc-900 p-8 text-center">
+          <AlertTriangle className="size-8 text-amber-400" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Not logged in</h2>
+            <p className="text-sm text-muted-foreground">
+              Please log in to view your sessions.
+            </p>
           </div>
-          <div className="relative h-full flex flex-col items-center justify-center px-6 md:px-10">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight text-center mb-6">
-              MY SESSIONS
-            </h1>
-            <div className="flex gap-3 animate-pulse">
-              <div className="h-10 w-36 rounded-full bg-zinc-700/60" />
-              <div className="h-10 w-40 rounded-full bg-zinc-700/60" />
-            </div>
-          </div>
-        </div>
-        <div className="container mx-auto max-w-7xl px-4 pb-8 -mt-6 md:-mt-8 relative z-10">
-          <div className="p-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-zinc-800/50 border-2 border-zinc-700 rounded-3xl p-5 animate-pulse"
-                >
-                  <div className="flex items-center mb-3 gap-2">
-                    <div className="h-5 w-5 rounded bg-zinc-700 shrink-0" />
-                    <div className="h-4 w-36 rounded-full bg-zinc-700" />
-                  </div>
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 rounded bg-zinc-700 shrink-0" />
-                      <div className="h-3.5 w-44 rounded-full bg-zinc-700" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 rounded bg-zinc-700 shrink-0" />
-                      <div className="h-3.5 w-28 rounded-full bg-zinc-700" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 rounded bg-zinc-700 shrink-0" />
-                      <div className="h-3.5 w-20 rounded-full bg-zinc-700" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Button asChild>
+            <Link to="/">Go home</Link>
+          </Button>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        <Navbar />
-        <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-8 text-center">
-          <AlertTriangle className="h-8 w-8 text-yellow-500 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Not logged in</h2>
-          <p className="text-zinc-400 mb-6">
-            Please log in to view your sessions.
-          </p>
-          <Link
-            to="/"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full transition-all"
-          >
-            Go Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const showSkeleton = isLoading || loading;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white relative">
-      <Navbar />
+    <TooltipProvider>
+      <div className="shadcn-scope min-h-screen bg-background text-foreground">
+        <Navbar />
 
-      <div className="relative w-full h-80 md:h-96 overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            src="/assets/images/hero.webp"
-            alt="Banner"
-            className="object-cover w-full h-full scale-110"
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: customLoaded ? 1 : 0,
-              transition: 'opacity 0.5s ease-in-out',
-            }}
-          />
-          <div className="absolute inset-0 bg-linear-to-b from-zinc-950/40 via-zinc-950/70 to-zinc-950"></div>
-        </div>
+        <PageHero title="MY SESSIONS">
+          {showSkeleton ? (
+            <div className="flex gap-3">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="h-9 w-40 rounded-lg" />
+            </div>
+          ) : (
+            <div className="flex w-full flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
+              <CountLabel icon={<FolderOpen />}>
+                {sessions.length}/{maxSessions}{' '}
+                {sessions.length === 1 ? 'session' : 'sessions'}
+              </CountLabel>
+              {atLimit ? (
+                <Button disabled className="w-full sm:w-auto">
+                  <Plus />
+                  New session
+                </Button>
+              ) : (
+                <Button asChild className="w-full sm:w-auto">
+                  <Link to="/create">
+                    <Plus />
+                    New session
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
+        </PageHero>
 
-        <div className="relative h-full flex flex-col items-center justify-center px-6 md:px-10">
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight text-center mb-6">
-            MY SESSIONS
-          </h1>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full px-4">
-            <div className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-900 backdrop-blur-md border border-blue-900 rounded-full shadow-lg h-12 sm:h-auto">
-              <FolderOpen className="h-5 w-5 text-blue-200" />
-              <span className="text-blue-200 text-sm font-semibold tracking-wider whitespace-nowrap">
-                {sessions.length}/{maxSessions} SESSION
-                {sessions.length === 1 ? '' : 'S'}
-              </span>
+        <div className="relative z-10 mx-auto -mt-6 w-full max-w-7xl px-4 pb-16 sm:px-6 md:-mt-8">
+          <div className="flex flex-col gap-6">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, session ID, airport, runway..."
+                aria-label="Search sessions"
+                className="h-11 rounded-xl border-zinc-800 bg-zinc-900 pl-10 dark:bg-zinc-900"
+              />
             </div>
 
-            <Button
-              onClick={() => (window.location.href = '/create')}
-              size="md"
-              disabled={sessions.length >= maxSessions}
-              className={`
-                whitespace-nowrap w-full sm:w-auto
-                ${sessions.length >= maxSessions ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-            >
-              Create New Session
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto max-w-7xl px-4 pb-8 -mt-6 md:-mt-8 relative z-10">
-        <div className="overflow-hidden">
-          <div className="p-6 space-y-6">
             {error && (
-              <div className="p-3 bg-red-900/40 border border-red-700 rounded-full flex items-center text-sm">
-                <AlertTriangle className="h-5 w-5 mr-2 text-red-400" />
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 px-5 py-3 text-sm text-destructive"
+              >
+                <AlertTriangle className="size-4 shrink-0" />
                 {error}
               </div>
             )}
 
-            {sessions.length >= maxSessions && (
-              <div className="p-4 bg-yellow-900/20 border-2 border-red-600/30 rounded-xl">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                  <span className="text-red-400 font-medium">
+            {!showSkeleton && atLimit && (
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <div className="space-y-0.5 text-sm">
+                  <p className="font-medium text-amber-300">
                     Session limit reached
-                  </span>
-                </div>
-                <p className="text-red-200 mt-1">
-                  You have reached the maximum of {maxSessions} sessions.{' '}
-                  <span className="italic">
+                  </p>
+                  <p className="text-muted-foreground">
+                    You have reached the maximum of {maxSessions} sessions.
                     Delete an old session to create a new one.
-                  </span>
-                </p>
+                  </p>
+                </div>
               </div>
             )}
 
-            {sessions.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="inline-block p-4 bg-blue-600/20 rounded-full mb-4">
-                  <Workflow className="h-12 w-12 text-blue-400" />
+            {showSkeleton ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SessionCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 rounded-3xl border-2 border-zinc-800 bg-zinc-900 px-6 py-12 text-center">
+                <Workflow className="size-10 text-blue-400" />
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold">No sessions yet</h2>
+                  <p className="text-sm text-muted-foreground">
+                    You haven't created any sessions yet.
+                  </p>
                 </div>
-                <h2 className="text-xl font-semibold mb-2">No sessions yet</h2>
-                <p className="text-zinc-400 mb-6">
-                  You haven't created any sessions yet.
-                </p>
-                <Link
-                  to="/create"
-                  className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full transition-all"
-                >
-                  Create Your First Session
-                </Link>
+                <Button asChild>
+                  <Link to="/create">
+                    <Plus />
+                    Create your first session
+                  </Link>
+                </Button>
+              </div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 rounded-3xl border-2 border-zinc-800 bg-zinc-900 px-6 py-12 text-center">
+                <Search className="size-10 text-blue-400" />
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold">
+                    No matching sessions
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Nothing matches “{query.trim()}”.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {sessions.map((session) => (
-                  <div
+                {filteredSessions.map((session) => (
+                  <SessionCard
                     key={session.sessionId}
-                    className="bg-zinc-800/50 border-2 border-zinc-700 hover:border-blue-600/50 rounded-3xl p-5 transition-all hover:bg-zinc-800/70 block relative"
-                  >
-                    <Link
-                      to={`/view/${session.sessionId}/?accessId=${session.accessId}`}
-                      className="block"
-                    >
-                      <div className="flex items-center mb-3">
-                        <FolderOpen className="h-5 w-5 text-blue-500 mr-2" />
-                        <span className="font-medium truncate text-md">
-                          {session.customName
-                            ? session.customName
-                            : `${session.airportIcao || 'Unknown'} Session`}
-                        </span>
-                        {session.isLegacy && (
-                          <Info className="h-4 w-4 text-yellow-400 ml-2" />
-                        )}
-                      </div>
-                      <div className="space-y-2 text-sm text-zinc-300">
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2 text-zinc-500" />
-                          {session.createdAt
-                            ? new Date(session.createdAt).toLocaleString()
-                            : 'Date unavailable'}
-                        </div>
-                        {session.activeRunway && (
-                          <div className="flex items-center">
-                            <PlaneTakeoff className="h-4 w-4 mr-2 text-zinc-500" />
-                            Departure Runway: {session.activeRunway}
-                          </div>
-                        )}
-                        <div className="flex items-center">
-                          {session.isAdvancedATC ? (
-                            <>
-                              <Workflow className="h-4 w-4 mr-2 text-purple-400" />
-                              <span className="text-purple-400 font-medium">
-                                Advanced ATC Session
-                              </span>
-                            </>
-                          ) : session.isPFATC ? (
-                            <>
-                              <Workflow className="h-4 w-4 mr-2 text-blue-400" />
-                              <span className="text-blue-400 font-medium">
-                                PFATC Session
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Workflow className="h-4 w-4 mr-2 text-green-400" />
-                              <span className="text-green-400 font-medium">
-                                Standard Session
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center">
-                          <Plane className="h-4 w-4 mr-2 text-zinc-500" />
-                          Flights: {session.flightCount}
-                        </div>
-                      </div>
-                    </Link>
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          startEditingName(
-                            session.sessionId,
-                            session.customName || ''
-                          )
-                        }
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => confirmDelete(session.sessionId)}
-                        disabled={deleteInProgress === session.sessionId}
-                      >
-                        <Trash2 className="h-4 w-4 text-white" />
-                      </Button>
-                    </div>
-                  </div>
+                    session={session}
+                    onRename={() => openRename(session)}
+                    onDelete={() => openDelete(session)}
+                  />
                 ))}
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Delete Confirmation Modal */}
-      {sessionToDelete && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border-2 border-red-600 rounded-2xl max-w-md w-full p-6 animate-fade-in">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-red-900/30 rounded-full mr-3">
-                  <AlertTriangle className="h-6 w-6 text-red-500" />
-                </div>
-                <h3 className="text-xl font-semibold">Delete Session</h3>
+        <Dialog
+          open={renameOpen}
+          onOpenChange={(open) => !savingName && setRenameOpen(open)}
+        >
+          <DialogContent className="shadcn-scope sm:max-w-md">
+            <form
+              className="grid gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveSessionName();
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>Rename session</DialogTitle>
+                <DialogDescription>
+                  Give this session a name so it's easier to find.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <Label htmlFor="session-name">Name</Label>
+                <Input
+                  id="session-name"
+                  value={editNameValue}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  placeholder={sessionName(renameTarget)}
+                  maxLength={50}
+                  disabled={savingName}
+                  autoFocus
+                />
               </div>
-              <button
-                onClick={() => setSessionToDelete(null)}
-                className="p-1 rounded-full hover:bg-zinc-700"
-              >
-                <X className="h-5 w-5 text-zinc-400" />
-              </button>
-            </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={savingName}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingName || !editNameValue.trim()}
+                >
+                  {savingName && <Loader2 className="animate-spin" />}
+                  {savingName ? 'Saving…' : 'Save name'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-            <div className="mb-6">
-              {sessions.find((s) => s.sessionId === sessionToDelete)
-                ?.isLegacy && (
-                <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2" />
-                    <span className="text-yellow-400 font-medium">
-                      Legacy Session
-                    </span>
-                  </div>
-                  <p className="text-sm text-yellow-200">
-                    This session uses old encryption. Deleting it is recommended
-                    for security.
-                  </p>
-                </div>
-              )}
-              <p className="text-zinc-300 mb-2">
-                Are you sure you want to delete this session? This action cannot
-                be undone.
-              </p>
-              <p className="text-sm text-zinc-400">
-                Session:{' '}
-                <span className="font-medium">
-                  {sessions.find((s) => s.sessionId === sessionToDelete)
-                    ?.customName ||
-                    `${
-                      sessions.find((s) => s.sessionId === sessionToDelete)
-                        ?.airportIcao || 'Unknown'
-                    } Session`}
-                </span>
-              </p>
-              <p className="text-sm text-zinc-500 font-mono">
-                ID: {sessionToDelete}
-              </p>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="secondary"
-                onClick={() => setSessionToDelete(null)}
-                className="px-4 py-2 transition-colors"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleDeleteSession}
-                disabled={!!deleteInProgress}
-                variant="danger"
-              >
-                {deleteInProgress ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin border-2 border-zinc-300 border-t-white"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete Session'
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingName && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border-2 border-blue-800 rounded-2xl max-w-md w-full p-6 animate-fade-in">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-900/30 rounded-full mr-3">
-                  <Pencil className="h-6 w-6 text-blue-400" />
-                </div>
-                <h3 className="text-xl font-semibold">Edit Session Name</h3>
+        <AlertDialog
+          open={deleteOpen}
+          onOpenChange={(open) => !deleting && setDeleteOpen(open)}
+        >
+          <AlertDialogContent variant="danger" className="shadcn-scope">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete session?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-medium text-foreground">
+                  {sessionName(deleteTarget)}
+                </span>{' '}
+                will be permanently deleted. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {deleteTarget?.isLegacy && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <p>
+                  <span className="font-medium text-amber-300">
+                    Legacy session.
+                  </span>{' '}
+                  <span className="text-muted-foreground">
+                    It uses old encryption, so deleting it is recommended.
+                  </span>
+                </p>
               </div>
-              <button
-                onClick={() => setEditingName(null)}
-                className="p-1 rounded-full hover:bg-zinc-700"
-              >
-                <X className="h-5 w-5 text-zinc-400" />
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-zinc-300 mb-4">
-                Change the name for this session. This helps you identify it
-                more easily.
-              </p>
-              <TextInput
-                value={editNameValue}
-                onChange={setEditNameValue}
-                maxLength={50}
-                disabled={savingName === editingName}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveSessionName(editingName);
-                  if (e.key === 'Escape') setEditingName(null);
+            )}
+            <p className="font-mono text-xs text-muted-foreground">
+              ID: {deleteTarget?.sessionId}
+            </p>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={deleting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteSession();
                 }}
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="secondary"
-                onClick={() => setEditingName(null)}
-                className="px-4 py-2 transition-colors"
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => saveSessionName(editingName)}
-                disabled={savingName === editingName || !editNameValue.trim()}
-                className="px-4 py-2 transition-colors flex items-center"
-              >
-                {savingName === editingName ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-white"></div>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Name'
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+                {deleting && <Loader2 className="animate-spin" />}
+                {deleting ? 'Deleting…' : 'Delete session'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   );
 }

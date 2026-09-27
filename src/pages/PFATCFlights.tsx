@@ -1439,7 +1439,7 @@ export default function PFATCFlights() {
                     placeholder="Search by callsign, aircraft, departure, or arrival..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border-2 border-zinc-700 rounded-full text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 hover:border-zinc-600"
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border-2 border-zinc-700 rounded-full text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-all duration-200 hover:border-zinc-600"
                   />
                 </div>
 

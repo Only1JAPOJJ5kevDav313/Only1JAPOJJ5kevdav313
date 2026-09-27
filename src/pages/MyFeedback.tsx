@@ -610,7 +610,7 @@ export default function MyFeedback() {
           value={reportReason}
           onChange={(e) => setReportReason(e.target.value)}
           placeholder="Enter reason for reporting..."
-          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-800 resize-y max-h-48"
+          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:border-red-800 resize-y max-h-48"
           maxLength={MAX_REPORT_REASON_LENGTH}
           rows={4}
           disabled={submittingReport}

@@ -20,7 +20,7 @@ export default function AcarsNotePanel({
           value={notes}
           onChange={handleNotesChange}
           placeholder="Loading flight plan details..."
-          className="w-full h-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-300 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-zinc-600"
+          className="w-full h-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-300 font-mono resize-none focus:outline-none focus:border-blue-500 placeholder-zinc-600"
         />
       </div>
     </div>

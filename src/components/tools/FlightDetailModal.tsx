@@ -332,7 +332,7 @@ export default function FlightDetailsModal({
                   flight.route || ''
                 )
               }
-              className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-4 text-white font-mono text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-4 text-white font-mono text-sm leading-relaxed resize-y focus:outline-none focus:border-blue-600"
               placeholder="Enter route..."
               rows={4}
             />

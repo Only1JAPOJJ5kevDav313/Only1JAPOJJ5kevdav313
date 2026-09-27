@@ -1317,7 +1317,7 @@ export default function ChatSidebar({
           value={reportReason}
           onChange={(e) => setReportReason(e.target.value)}
           placeholder="Enter reason for reporting..."
-          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-800"
+          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:border-red-800"
           maxLength={200}
           rows={4}
         />

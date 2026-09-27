@@ -386,7 +386,7 @@ IDENTIFIER: ${identifier}`;
                 value={customRemarks}
                 onChange={(e) => setCustomRemarks(e.target.value)}
                 placeholder="Enter PDC remarks..."
-                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg p-3 font-mono text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg p-3 font-mono text-sm min-h-[80px] resize-y focus:outline-none focus:border-blue-500"
                 maxLength={250}
               />
               <p className="text-xs text-gray-500 mt-1">Edit Remarks</p>

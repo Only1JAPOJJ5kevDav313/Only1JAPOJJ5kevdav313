@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useState,
-  useRef,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from 'react';
+import { useEffect, useState, useRef, useContext, type ReactNode } from 'react';
 import {
   UNSAFE_NavigationContext,
   useLocation,
@@ -36,7 +29,7 @@ import AccountSettings from '../components/Settings/AccountSettings';
 import AcarsSettings from '../components/Settings/AcarsSettings';
 import Navbar from '../components/Navbar';
 import CustomTooltip from '../components/tutorial/CustomTooltip';
-import { fetchBackgrounds } from '../utils/fetch/data';
+import PageHero from '../components/common/PageHero';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -47,14 +40,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
-
-interface AvailableImage {
-  filename: string;
-  path: string;
-  extension: string;
-}
 
 type SectionId =
   | 'account-settings'
@@ -117,8 +102,6 @@ export default function Settings() {
   const [showTutorialCompleteModal, setShowTutorialCompleteModal] =
     useState(false);
   const preventNavigation = useRef(false);
-  const [availableImages, setAvailableImages] = useState<AvailableImage[]>([]);
-  const [customLoaded, setCustomLoaded] = useState(false);
 
   const [searchParams] = useSearchParams();
   const startTutorial = searchParams.get('tutorial') === 'true';
@@ -151,71 +134,6 @@ export default function Settings() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
-
-  useEffect(() => {
-    const loadImages = async () => {
-      try {
-        const data = await fetchBackgrounds();
-        setAvailableImages(data);
-      } catch (error) {
-        console.error('Error loading available images:', error);
-      }
-    };
-    loadImages();
-  }, []);
-
-  const backgroundImage = useMemo(() => {
-    const selectedImage = settings?.backgroundImage?.selectedImage;
-    let bgImage = 'url("/assets/images/hero.webp")';
-
-    const getImageUrl = (filename: string | null): string | null => {
-      if (!filename || filename === 'random' || filename === 'favorites') {
-        return filename;
-      }
-      if (filename.startsWith('https://api.cephie.app/')) {
-        return filename;
-      }
-      return `${API_BASE_URL}/assets/app/backgrounds/${filename}`;
-    };
-
-    if (selectedImage === 'random') {
-      if (availableImages.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableImages.length);
-        bgImage = `url(${API_BASE_URL}${availableImages[randomIndex].path})`;
-      }
-    } else if (selectedImage === 'favorites') {
-      const favorites = settings?.backgroundImage?.favorites || [];
-      if (favorites.length > 0) {
-        const randomFav =
-          favorites[Math.floor(Math.random() * favorites.length)];
-        const favImageUrl = getImageUrl(randomFav);
-        if (
-          favImageUrl &&
-          favImageUrl !== 'random' &&
-          favImageUrl !== 'favorites'
-        ) {
-          bgImage = `url(${favImageUrl})`;
-        }
-      }
-    } else if (selectedImage) {
-      const imageUrl = getImageUrl(selectedImage);
-      if (imageUrl && imageUrl !== 'random' && imageUrl !== 'favorites') {
-        bgImage = `url(${imageUrl})`;
-      }
-    }
-
-    return bgImage;
-  }, [
-    settings?.backgroundImage?.selectedImage,
-    settings?.backgroundImage?.favorites,
-    availableImages,
-  ]);
-
-  useEffect(() => {
-    if (backgroundImage !== 'url("/assets/images/hero.webp")') {
-      setCustomLoaded(true);
-    }
-  }, [backgroundImage]);
 
   const handleLocalSettingsChange = (updatedSettings: Settings) => {
     setLocalSettings(updatedSettings);
@@ -363,25 +281,7 @@ export default function Settings() {
     <div className="shadcn-scope min-h-screen bg-background text-foreground">
       <Navbar />
 
-      <div className="relative h-80 w-full overflow-hidden md:h-96">
-        <div className="absolute inset-0">
-          <img
-            src="/assets/images/hero.webp"
-            alt=""
-            className="h-full w-full scale-110 object-cover"
-          />
-          <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500"
-            style={{ backgroundImage, opacity: customLoaded ? 1 : 0 }}
-          />
-          <div className="absolute inset-0 bg-linear-to-b from-background/40 via-background/70 to-background" />
-        </div>
-        <div className="relative flex h-full flex-col items-center justify-center gap-4 px-4 sm:px-6 md:px-10">
-          <h1 className="text-center text-3xl font-black tracking-tight sm:text-5xl md:text-6xl">
-            YOUR SETTINGS
-          </h1>
-        </div>
-      </div>
+      <PageHero title="YOUR SETTINGS" />
 
       <div className="relative z-10 mx-auto -mt-6 w-full max-w-4xl min-w-0 px-4 pb-32 sm:px-6 md:-mt-8">
         <main className="flex min-w-0 flex-col gap-12">

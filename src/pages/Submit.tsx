@@ -912,7 +912,7 @@ export default function Submit({
                       maxLength={16}
                       onFocus={() => setRegistrationFocused(true)}
                       onBlur={() => setRegistrationFocused(false)}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                       style={
                         form.airlineIcao && !registrationFocused
                           ? { filter: 'grayscale(1)' }
@@ -933,7 +933,7 @@ export default function Submit({
                       }
                       placeholder="1234"
                       maxLength={8}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 </div>
@@ -950,7 +950,7 @@ export default function Submit({
                       }
                       placeholder="Optional"
                       maxLength={32}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 )}
@@ -996,7 +996,7 @@ export default function Submit({
                       onChange={(e) => handleChange('stand')(e.target.value)}
                       placeholder="e.g. A12"
                       maxLength={8}
-                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 </div>
@@ -1038,7 +1038,7 @@ export default function Submit({
                         handleChange('cruisingFL')(e.target.value)
                       }
                       placeholder="e.g. 350"
-                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                       maxLength={3}
                       required
                     />
@@ -1073,7 +1073,7 @@ export default function Submit({
                     }}
                     placeholder="e.g. HAZEL NOVMA LEDGO"
                     maxLength={500}
-                    className="flex items-center w-full pl-6 pr-28 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                    className="flex items-center w-full pl-6 pr-28 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                   />
                   {/* Update 9: route generation disabled — no waypoint data
                       for the new airport roster yet. Re-enable once it's
@@ -1130,7 +1130,7 @@ export default function Submit({
                   onChange={(e) => handleChange('remark')(e.target.value)}
                   placeholder="Any additional information"
                   maxLength={255}
-                  className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                  className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                 />
               </div>
 
