@@ -82,6 +82,7 @@ export interface AdminScopeCatalogEntry {
   id: string;
   label: string;
   description: string;
+  hidden?: boolean;
 }
 
 export async function fetchAdminDeveloperCatalog(): Promise<
@@ -101,6 +102,7 @@ export interface AdminDeveloperSummary {
   avatar?: string | null;
   status: string;
   approvedScopes: string[];
+  allKeysScopes: string[];
   keysActive: number;
   keysPending: number;
   keysTotal: number;
@@ -229,20 +231,24 @@ export async function revokeAdminDeveloperKey(
 
 export async function patchAdminDeveloperProfileScopes(
   userId: string,
-  approvedScopes: string[]
-): Promise<void> {
+  approvedScopes: string[],
+  allKeysScopes: string[]
+): Promise<{
+  strippedKeys: { id: string; name: string; removed: string[] }[];
+}> {
   const res = await apiFetch(
     `${API_BASE_URL}/api/admin/developers/profiles/${encodeURIComponent(userId)}/scopes`,
     {
       method: 'PATCH',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approvedScopes }),
+      body: JSON.stringify({ approvedScopes, allKeysScopes }),
     }
   );
   if (!res.ok) {
     await apiError(res, 'Update scopes failed');
   }
+  return res.json();
 }
 
 export async function suspendDeveloperProfile(userId: string): Promise<void> {

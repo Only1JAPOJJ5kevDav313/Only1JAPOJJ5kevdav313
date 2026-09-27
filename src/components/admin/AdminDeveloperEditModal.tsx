@@ -1,26 +1,46 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  MdSave,
-  MdVpnKey,
-  MdShield,
-  MdCheck,
-  MdContentCopy,
-  MdRefresh,
-  MdDelete,
-} from 'react-icons/md';
+  Ban,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  KeyRound,
+  Loader2,
+  Pencil,
+  RotateCcw,
+  Save,
+  Trash2,
+  X,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react';
 import AdminModal from './AdminModal';
+import AdminStatusBadge from './AdminStatusBadge';
 import AdminTable from './AdminTable';
+import { AdminEmptyState, AdminLoading } from './AdminStates';
 import DeveloperDiscordAvatar from './DeveloperDiscordAvatar';
+import { useAdminConfirm } from './useAdminConfirm';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-  statusBadgeClass,
-  adminDownsizeButtonSize,
-  ADMIN_TABLE_HEAD,
-  ADMIN_TH,
-  ADMIN_TD,
-} from './adminConstants';
-import Button from '../common/Button';
-import { useToast } from '../../hooks/useToast';
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 import ScopeTagSelector from '../developers/ScopeTagSelector';
+import AdminScopePermissions from './AdminScopePermissions';
 import {
   approveAdminDeveloperKey,
   fetchAdminDeveloperCatalog,
@@ -34,7 +54,7 @@ import {
   type AdminScopeCatalogEntry,
 } from '../../utils/fetch/adminDevelopers';
 
-type Tab = 'ceiling' | 'keys';
+type Tab = 'permissions' | 'keys';
 
 type Props = {
   developer: AdminDeveloperSummary;
@@ -47,6 +67,51 @@ type Props = {
   deleteDeveloperBusy?: boolean;
 };
 
+const STATUS_ICON: Record<string, LucideIcon> = {
+  active: CheckCircle2,
+  pending: Clock,
+  rejected: XCircle,
+  revoked: Ban,
+  suspended: Ban,
+};
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function KeyRowAction({
+  label,
+  icon: Icon,
+  onClick,
+  disabled,
+  destructive,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className={
+            destructive ? 'text-destructive hover:text-destructive' : undefined
+          }
+        >
+          <Icon />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function AdminDeveloperEditModal({
   developer,
   onReload,
@@ -57,16 +122,23 @@ export default function AdminDeveloperEditModal({
   onDeleteDeveloper,
   deleteDeveloperBusy,
 }: Props) {
-  const { showError } = useToast();
-  const [tab, setTab] = useState<Tab>('ceiling');
+  const { confirm, confirmDialog } = useAdminConfirm();
+  const [tab, setTab] = useState<Tab>('permissions');
   const [catalog, setCatalog] = useState<AdminScopeCatalogEntry[]>([]);
   const [keys, setKeys] = useState<AdminDeveloperKeyRow[]>([]);
   const [keysLoading, setKeysLoading] = useState(true);
-  const [ceiling, setCeiling] = useState<Set<string>>(
-    () => new Set(developer.approvedScopes)
+  const savedAllowed = useMemo(
+    () => new Set(developer.approvedScopes),
+    [developer.approvedScopes]
   );
-  const [ceilingBusy, setCeilingBusy] = useState(false);
-  const [ceilingSaved, setCeilingSaved] = useState(false);
+  const savedAllKeys = useMemo(
+    () => new Set(developer.allKeysScopes ?? []),
+    [developer.allKeysScopes]
+  );
+  const [allowed, setAllowed] = useState<Set<string>>(savedAllowed);
+  const [allKeys, setAllKeys] = useState<Set<string>>(savedAllKeys);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
+  const [permissionsSaved, setPermissionsSaved] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [revealedCopied, setRevealedCopied] = useState(false);
@@ -83,8 +155,15 @@ export default function AdminDeveloperEditModal({
   const [editRpm, setEditRpm] = useState('');
 
   useEffect(() => {
-    setCeiling(new Set(developer.approvedScopes));
-  }, [developer.userId, developer.approvedScopes]);
+    setAllowed(new Set(savedAllowed));
+    setAllKeys(new Set(savedAllKeys));
+  }, [developer.userId, savedAllowed, savedAllKeys]);
+
+  const permissionsDirty = useMemo(() => {
+    const same = (a: Set<string>, b: Set<string>) =>
+      a.size === b.size && [...a].every((x) => b.has(x));
+    return !same(allowed, savedAllowed) || !same(allKeys, savedAllKeys);
+  }, [allowed, allKeys, savedAllowed, savedAllKeys]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,17 +199,26 @@ export default function AdminDeveloperEditModal({
     [catalog]
   );
 
-  const saveCeiling = async () => {
-    setCeilingBusy(true);
+  const savePermissions = async () => {
+    setPermissionsBusy(true);
     try {
-      await patchAdminDeveloperProfileScopes(developer.userId, [...ceiling]);
-      setCeilingSaved(true);
-      setTimeout(() => setCeilingSaved(false), 2000);
-      await onReload();
+      const { strippedKeys } = await patchAdminDeveloperProfileScopes(
+        developer.userId,
+        [...allowed],
+        [...allKeys]
+      );
+      setPermissionsSaved(true);
+      setTimeout(() => setPermissionsSaved(false), 2000);
+      if (strippedKeys.length > 0) {
+        toast.success(
+          `Removed scopes from ${strippedKeys.length} key${strippedKeys.length === 1 ? '' : 's'}`
+        );
+      }
+      await Promise.all([onReload(), reloadKeys()]);
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      setCeilingBusy(false);
+      setPermissionsBusy(false);
     }
   };
 
@@ -163,36 +251,44 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Approve failed');
+      toast.error(e instanceof Error ? e.message : 'Approve failed');
     } finally {
       setRowBusy(null);
     }
   };
 
   const submitRejectKey = async (k: AdminDeveloperKeyRow) => {
-    if (!confirm('Reject this key request?')) return;
-    setRowBusy(k.id);
-    try {
-      await rejectAdminDeveloperKey(developer.userId, k.id);
-      await reloadKeys();
-      await onReload();
-    } catch (e) {
-      showError(e instanceof Error ? e.message : 'Reject failed');
-    } finally {
-      setRowBusy(null);
-    }
+    await confirm({
+      title: 'Reject this key request?',
+      description: `The request for "${k.name}" will be rejected.`,
+      confirmText: 'Reject',
+      destructive: true,
+      action: async () => {
+        setRowBusy(k.id);
+        try {
+          await rejectAdminDeveloperKey(developer.userId, k.id);
+          await reloadKeys();
+          await onReload();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Reject failed');
+          throw e;
+        } finally {
+          setRowBusy(null);
+        }
+      },
+    });
   };
 
   const openEdit = (k: AdminDeveloperKeyRow) => {
     setEditKey(k);
-    setEditScopes(new Set(k.scopes));
+    setEditScopes(new Set(k.scopes.filter((s) => !savedAllKeys.has(s))));
     setEditRpm(
       k.rateLimitPerMinute != null ? String(k.rateLimitPerMinute) : ''
     );
   };
 
   const saveEdit = async () => {
-    if (!editKey || editScopes.size === 0) return;
+    if (!editKey || editScopes.size + savedAllKeys.size === 0) return;
     setRowBusy(editKey.id);
     try {
       const rpm =
@@ -205,24 +301,33 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setRowBusy(null);
     }
   };
 
   const doRevoke = async (k: AdminDeveloperKeyRow) => {
-    if (!confirm(`Revoke key "${k.name}"?`)) return;
-    setRowBusy(k.id);
-    try {
-      await revokeAdminDeveloperKey(developer.userId, k.id);
-      await reloadKeys();
-      await onReload();
-    } catch (e) {
-      showError(e instanceof Error ? e.message : 'Revoke failed');
-    } finally {
-      setRowBusy(null);
-    }
+    await confirm({
+      title: `Revoke key "${k.name}"?`,
+      description:
+        'Requests using this key will fail immediately. This cannot be undone.',
+      confirmText: 'Revoke',
+      destructive: true,
+      action: async () => {
+        setRowBusy(k.id);
+        try {
+          await revokeAdminDeveloperKey(developer.userId, k.id);
+          await reloadKeys();
+          await onReload();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Revoke failed');
+          throw e;
+        } finally {
+          setRowBusy(null);
+        }
+      },
+    });
   };
 
   const copyRevealed = async () => {
@@ -231,8 +336,6 @@ export default function AdminDeveloperEditModal({
     setRevealedCopied(true);
     setTimeout(() => setRevealedCopied(false), 2000);
   };
-
-  const activeIndex = tab === 'ceiling' ? 0 : 1;
 
   const approveKeyFromCatalog = useMemo(
     () =>
@@ -243,9 +346,13 @@ export default function AdminDeveloperEditModal({
   );
 
   const editKeyFromCatalog = useMemo(
-    () => catalogSorted.filter((c) => ceiling.has(c.id)),
-    [catalogSorted, ceiling]
+    () => catalogSorted.filter((c) => savedAllowed.has(c.id)),
+    [catalogSorted, savedAllowed]
   );
+
+  const effectiveScopeCount = (k: AdminDeveloperKeyRow) =>
+    new Set([...k.scopes, ...savedAllKeys].filter((s) => savedAllowed.has(s)))
+      .size;
 
   return (
     <>
@@ -253,357 +360,350 @@ export default function AdminDeveloperEditModal({
         open
         onClose={onClose}
         title={developer.username}
-        size="lg"
+        size="full"
         footer={
-          onDeleteDeveloper ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 w-full mr-auto">
-              <p className="text-[11px] text-zinc-500 max-w-md leading-relaxed text-left">
-                Remove developer profile, keys, applications, and API usage
-                history.
-              </p>
-              <button
+          <>
+            {onDeleteDeveloper ? (
+              <Button
                 type="button"
+                variant="destructive"
+                className="sm:mr-auto"
                 disabled={deleteDeveloperBusy}
                 onClick={() => void onDeleteDeveloper()}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-950/60 text-red-200 text-xs font-semibold border border-red-900/50 hover:bg-red-900/50 disabled:opacity-50 transition-colors shrink-0"
               >
                 {deleteDeveloperBusy ? (
-                  <MdRefresh className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                  <Loader2 className="animate-spin" aria-hidden />
                 ) : (
-                  <MdDelete className="w-3.5 h-3.5" aria-hidden />
+                  <Trash2 aria-hidden />
                 )}
                 Delete developer
-              </button>
-            </div>
-          ) : undefined
-        }
-      >
-        <div className="flex items-center justify-between gap-3 mb-4 -mt-1">
-          <div className="flex items-center gap-3 min-w-0">
-            <DeveloperDiscordAvatar
-              userId={developer.userId}
-              username={developer.username}
-              avatar={developer.avatar}
-              className="h-9 w-9"
-            />
-            <div className="min-w-0">
-              <span
-                className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${statusBadgeClass(developer.status)}`}
-              >
-                {developer.status}
-              </span>
-              <p className="text-[11px] text-zinc-500 font-mono truncate mt-1">
-                {developer.userId}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
+              </Button>
+            ) : null}
             {developer.status === 'active' && onProfileSuspend && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 disabled={profileActionBusy}
                 onClick={() => {
                   onProfileSuspend();
                   onClose();
                 }}
-                className="px-3 py-1.5 rounded-lg border border-amber-800/60 bg-amber-950/40 text-amber-200 text-xs font-medium hover:bg-amber-950/60 disabled:opacity-50 transition-colors"
               >
+                <Ban />
                 Suspend
-              </button>
+              </Button>
             )}
             {developer.status !== 'active' && onProfileReactivate && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 disabled={profileActionBusy}
                 onClick={() => {
                   onProfileReactivate();
                   onClose();
                 }}
-                className="px-3 py-1.5 rounded-lg border border-emerald-800/50 bg-emerald-950/35 text-emerald-200 text-xs font-medium hover:bg-emerald-950/55 disabled:opacity-50 transition-colors"
               >
+                <RotateCcw />
                 Reactivate
-              </button>
+              </Button>
             )}
-          </div>
+            {tab === 'permissions' && (
+              <Button
+                type="button"
+                disabled={
+                  permissionsBusy || !permissionsDirty || allowed.size === 0
+                }
+                onClick={() => void savePermissions()}
+              >
+                {permissionsSaved ? (
+                  <>
+                    <Check /> Saved
+                  </>
+                ) : (
+                  <>
+                    {permissionsBusy ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Save />
+                    )}
+                    {permissionsBusy ? 'Saving…' : 'Save permissions'}
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <DeveloperDiscordAvatar
+            userId={developer.userId}
+            username={developer.username}
+            avatar={developer.avatar}
+            className="size-9"
+          />
+          <AdminStatusBadge
+            status={developer.status}
+            icon={STATUS_ICON[developer.status]}
+            showLabel
+          >
+            {capitalize(developer.status)}
+          </AdminStatusBadge>
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {developer.userId}
+          </p>
         </div>
 
-        <nav
-          className="relative flex rounded-full bg-zinc-800/95 p-1 shadow-inner ring-1 ring-zinc-700/60 max-w-xs mb-4"
-          aria-label="Developer edit sections"
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as Tab)}
+          className="gap-5"
         >
-          <div
-            className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-linear-to-b from-blue-500 to-blue-700 shadow-md transition-[left,width] duration-300 ease-out"
-            style={{
-              width: 'calc(50% - 0.25rem)',
-              left: activeIndex === 0 ? '0.25rem' : 'calc(50%)',
-            }}
-            aria-hidden
-          />
-          <button
-            type="button"
-            onClick={() => setTab('ceiling')}
-            className={`relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${tab === 'ceiling' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+          <TabsList
+            className="w-full sm:w-auto"
+            aria-label="Developer edit sections"
           >
-            <MdShield className="w-3.5 h-3.5" />
-            Scope ceiling
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('keys')}
-            className={`relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${tab === 'keys' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
-          >
-            <MdVpnKey className="w-3.5 h-3.5" />
-            Keys
-            {developer.keysPending > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-[9px] font-bold text-black">
-                {developer.keysPending}
-              </span>
-            )}
-          </button>
-        </nav>
-
-        {tab === 'ceiling' && (
-          <div className="space-y-4">
-            <p className="text-xs text-zinc-500">
-              Scopes checked here are the maximum this developer can assign to
-              their keys.
-            </p>
-            <ScopeTagSelector
-              catalog={catalog}
-              selected={ceiling}
-              onChange={setCeiling}
-            />
-            <button
-              type="button"
-              disabled={ceilingBusy || ceiling.size === 0}
-              onClick={() => void saveCeiling()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 text-white text-sm font-medium transition-colors"
-            >
-              {ceilingSaved ? (
-                <>
-                  <MdCheck className="w-4 h-4" /> Saved
-                </>
-              ) : (
-                <>
-                  <MdSave className="w-4 h-4" />{' '}
-                  {ceilingBusy ? 'Saving…' : 'Save ceiling'}
-                </>
+            <TabsTrigger value="permissions">
+              Permissions
+              {permissionsDirty && (
+                <span
+                  className="size-1.5 rounded-full bg-amber-500"
+                  aria-label="Unsaved changes"
+                />
               )}
-            </button>
-          </div>
-        )}
+            </TabsTrigger>
+            <TabsTrigger value="keys">
+              Keys
+              {developer.keysPending > 0 && (
+                <span className="text-muted-foreground tabular-nums">
+                  {developer.keysPending}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {tab === 'keys' && (
-          <div>
-            {keysLoading ? (
-              <div className="flex justify-center py-12">
-                <MdRefresh className="w-6 h-6 text-blue-400 animate-spin" />
-              </div>
-            ) : keys.length === 0 ? (
-              <p className="text-sm text-zinc-500 py-8 text-center">
-                No keys yet.
+          <TabsContent value="permissions">
+            {catalog.length === 0 ? (
+              <AdminLoading label="Loading scopes…" className="py-12" />
+            ) : (
+              <AdminScopePermissions
+                catalog={catalog}
+                allowed={allowed}
+                allKeys={allKeys}
+                savedAllowed={savedAllowed}
+                savedAllKeys={savedAllKeys}
+                keys={keys}
+                disabled={permissionsBusy}
+                onChange={(a, all) => {
+                  setAllowed(a);
+                  setAllKeys(all);
+                }}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="keys" className="flex flex-col gap-4">
+            {permissionsDirty ? (
+              <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                You have unsaved permission changes. Keys use the saved
+                permissions until you save them on the Permissions tab.
               </p>
+            ) : null}
+            {keysLoading ? (
+              <AdminLoading label="Loading keys…" className="py-12" />
+            ) : keys.length === 0 ? (
+              <AdminEmptyState icon={KeyRound} title="No keys yet" />
             ) : (
               <AdminTable minWidth="560px">
-                <thead className={ADMIN_TABLE_HEAD}>
-                  <tr>
-                    <th className={ADMIN_TH}>Name</th>
-                    <th className={ADMIN_TH}>Status</th>
-                    <th className={ADMIN_TH}>RPM</th>
-                    <th className={ADMIN_TH}>Last used</th>
-                    <th className={ADMIN_TH}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/80">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Scopes</TableHead>
+                    <TableHead>RPM</TableHead>
+                    <TableHead>Last used</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {keys.map((k) => {
                     const st = k.revokedAt ? 'revoked' : (k.status ?? 'active');
                     return (
-                      <tr key={k.id} className="hover:bg-zinc-800/20">
-                        <td className={ADMIN_TD}>
-                          <div className="font-medium text-zinc-100 leading-snug">
+                      <TableRow key={k.id}>
+                        <TableCell>
+                          <div className="leading-snug font-medium">
                             {k.name}
                           </div>
-                          <code className="text-[10px] text-zinc-500">
+                          <code className="font-mono text-xs text-muted-foreground">
                             {k.prefix}…
                           </code>
-                        </td>
-                        <td className={ADMIN_TD}>
-                          <span
-                            className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${statusBadgeClass(st)}`}
-                          >
-                            {st}
-                          </span>
-                        </td>
-                        <td className={ADMIN_TD}>
-                          {k.rateLimitPerMinute ?? '—'}
-                        </td>
-                        <td className={`${ADMIN_TD} whitespace-nowrap`}>
+                        </TableCell>
+                        <TableCell>
+                          <AdminStatusBadge status={st} icon={STATUS_ICON[st]}>
+                            {capitalize(st)}
+                          </AdminStatusBadge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {k.status === 'active' && !k.revokedAt
+                            ? effectiveScopeCount(k)
+                            : '–'}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {k.rateLimitPerMinute ?? (
+                            <span className="text-muted-foreground">
+                              Default
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
                           {k.lastUsedAt
                             ? new Date(k.lastUsedAt).toLocaleDateString()
-                            : '—'}
-                        </td>
-                        <td className={`${ADMIN_TD} whitespace-nowrap`}>
+                            : 'Never'}
+                        </TableCell>
+                        <TableCell className="text-right">
                           {k.revokedAt ? (
-                            <span className="text-xs text-zinc-600">
+                            <span className="text-xs text-muted-foreground">
                               Revoked
                             </span>
                           ) : k.status === 'pending' ? (
-                            <div className="flex gap-1">
-                              <Button
-                                type="button"
-                                variant="primary"
-                                size={adminDownsizeButtonSize('xs')}
+                            <div className="flex justify-end gap-1">
+                              <KeyRowAction
+                                label="Approve key request"
+                                icon={Check}
                                 disabled={rowBusy === k.id}
                                 onClick={() => openApprove(k)}
-                                className="bg-none bg-emerald-800/80 hover:bg-none hover:bg-emerald-700"
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size={adminDownsizeButtonSize('xs')}
+                              />
+                              <KeyRowAction
+                                label="Reject key request"
+                                icon={X}
+                                destructive
                                 disabled={rowBusy === k.id}
                                 onClick={() => void submitRejectKey(k)}
-                              >
-                                Reject
-                              </Button>
+                              />
                             </div>
                           ) : k.status === 'active' ? (
-                            <div className="flex gap-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size={adminDownsizeButtonSize('xs')}
+                            <div className="flex justify-end gap-1">
+                              <KeyRowAction
+                                label="Edit key"
+                                icon={Pencil}
                                 disabled={rowBusy === k.id}
                                 onClick={() => openEdit(k)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="danger"
-                                size={adminDownsizeButtonSize('xs')}
+                              />
+                              <KeyRowAction
+                                label="Revoke key"
+                                icon={Ban}
+                                destructive
                                 disabled={rowBusy === k.id}
                                 onClick={() => void doRevoke(k)}
-                              >
-                                Revoke
-                              </Button>
+                              />
                             </div>
                           ) : null}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
+                </TableBody>
               </AdminTable>
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </AdminModal>
 
       <AdminModal
         open={!!approveKey}
         onClose={() => setApproveKey(null)}
         title="Approve key request"
+        description={approveKey?.name}
         size="md"
         footer={
           <>
             <Button
               type="button"
-              variant="ghost"
-              size={adminDownsizeButtonSize('sm')}
+              variant="outline"
               onClick={() => setApproveKey(null)}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              variant="primary"
-              size={adminDownsizeButtonSize('sm')}
               disabled={approveScopes.size === 0 || rowBusy != null}
               onClick={() => void submitApprove()}
-              className="bg-none bg-emerald-600 hover:bg-none hover:bg-emerald-500"
             >
+              {rowBusy != null && approveKey && rowBusy === approveKey.id ? (
+                <Loader2 className="animate-spin" />
+              ) : null}
               Approve & issue secret
             </Button>
           </>
         }
       >
         {approveKey && (
-          <>
-            <p className="text-sm text-zinc-400 mb-4">{approveKey.name}</p>
-            <p className="text-xs text-zinc-400 mb-3">
-              Select allowed scopes (subset of what was requested)
-            </p>
-            <ScopeTagSelector
-              catalog={approveKeyFromCatalog}
-              selected={approveScopes}
-              onChange={setApproveScopes}
-            />
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">
-                  Rate limit / min (empty = default)
-                </label>
-                <input
-                  value={approveRpm}
-                  onChange={(e) => setApproveRpm(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  placeholder="e.g. 120"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">
-                  Note (optional)
-                </label>
-                <textarea
-                  value={approveNote}
-                  onChange={(e) => setApproveNote(e.target.value)}
-                  placeholder="Visible to developer"
-                  rows={2}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
-                />
-              </div>
+          <div className="grid gap-5">
+            <div className="grid gap-2">
+              <Label>Requested scopes to approve</Label>
+              <ScopeTagSelector
+                catalog={approveKeyFromCatalog}
+                selected={approveScopes}
+                onChange={setApproveScopes}
+              />
+              {savedAllKeys.size > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Plus {savedAllKeys.size} scope
+                  {savedAllKeys.size === 1 ? '' : 's'} set to "All keys" on the
+                  Permissions tab, added automatically.
+                </p>
+              ) : null}
             </div>
-          </>
+            <div className="grid gap-2">
+              <Label htmlFor="admin-dev-approve-rpm">
+                Rate limit / min (empty = default)
+              </Label>
+              <Input
+                id="admin-dev-approve-rpm"
+                inputMode="numeric"
+                value={approveRpm}
+                onChange={(e) => setApproveRpm(e.target.value)}
+                placeholder="e.g. 120"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="admin-dev-approve-note">Note (optional)</Label>
+              <Textarea
+                id="admin-dev-approve-note"
+                value={approveNote}
+                onChange={(e) => setApproveNote(e.target.value)}
+                placeholder="Visible to developer"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+          </div>
         )}
       </AdminModal>
 
       <AdminModal
         open={!!revealedSecret}
         onClose={() => setRevealedSecret(null)}
-        title="Key approved — copy secret now"
+        title="Key approved: copy the secret now"
+        variant="success"
+        description="This is shown only once."
         size="md"
         footer={
           <>
             <Button
               type="button"
-              variant="primary"
-              size={adminDownsizeButtonSize('sm')}
-              onClick={() => void copyRevealed()}
-              className="flex-1 bg-none bg-emerald-700 hover:bg-none hover:bg-emerald-600"
-            >
-              {revealedCopied ? (
-                <MdCheck className="w-4 h-4 inline mr-1" />
-              ) : (
-                <MdContentCopy className="w-4 h-4 inline mr-1" />
-              )}
-              {revealedCopied ? 'Copied' : 'Copy secret'}
-            </Button>
-            <Button
-              type="button"
               variant="outline"
-              size={adminDownsizeButtonSize('sm')}
               onClick={() => setRevealedSecret(null)}
             >
               Done
             </Button>
+            <Button type="button" onClick={() => void copyRevealed()}>
+              {revealedCopied ? <Check /> : <Copy />}
+              {revealedCopied ? 'Copied' : 'Copy secret'}
+            </Button>
           </>
         }
       >
-        <p className="text-xs text-zinc-500 mb-3">This is shown only once.</p>
-        <pre className="text-xs text-emerald-200 break-all bg-black/40 rounded-xl p-3 font-mono leading-relaxed">
+        <pre className="max-h-80 overflow-auto rounded-xl bg-muted/50 p-4 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {revealedSecret}
         </pre>
       </AdminModal>
@@ -611,54 +711,65 @@ export default function AdminDeveloperEditModal({
       <AdminModal
         open={!!editKey}
         onClose={() => setEditKey(null)}
-        title={editKey ? `Edit key — ${editKey.name}` : 'Edit key'}
+        title={editKey ? `Edit key: ${editKey.name}` : 'Edit key'}
         size="md"
         footer={
           <>
             <Button
               type="button"
-              variant="ghost"
-              size={adminDownsizeButtonSize('sm')}
+              variant="outline"
               onClick={() => setEditKey(null)}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              variant="primary"
-              size={adminDownsizeButtonSize('sm')}
-              disabled={editScopes.size === 0 || rowBusy != null}
+              disabled={
+                editScopes.size + savedAllKeys.size === 0 || rowBusy != null
+              }
               onClick={() => void saveEdit()}
             >
+              {rowBusy != null && editKey && rowBusy === editKey.id ? (
+                <Loader2 className="animate-spin" />
+              ) : null}
               Save
             </Button>
           </>
         }
       >
         {editKey && (
-          <>
-            <p className="text-xs text-zinc-500 mb-4">
-              Scopes must stay within the profile ceiling.
-            </p>
-            <ScopeTagSelector
-              catalog={editKeyFromCatalog}
-              selected={editScopes}
-              onChange={setEditScopes}
-            />
-            <div className="mt-4">
-              <label className="block text-xs text-zinc-500 mb-1">
+          <div className="grid gap-5">
+            <div className="grid gap-2">
+              <Label>Scopes</Label>
+              <p className="text-xs text-muted-foreground">
+                Only scopes set to "Allowed" or "All keys" on the Permissions
+                tab are listed. "All keys" scopes can't be removed per key.
+              </p>
+              <ScopeTagSelector
+                catalog={editKeyFromCatalog}
+                selected={editScopes}
+                onChange={setEditScopes}
+                locked={savedAllKeys}
+                lockedLabel="All keys"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="admin-dev-edit-rpm">
                 RPM override (empty = default)
-              </label>
-              <input
+              </Label>
+              <Input
+                id="admin-dev-edit-rpm"
+                inputMode="numeric"
                 value={editRpm}
                 onChange={(e) => setEditRpm(e.target.value)}
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 placeholder="e.g. 60"
               />
             </div>
-          </>
+          </div>
         )}
       </AdminModal>
+
+      {confirmDialog}
     </>
   );
 }

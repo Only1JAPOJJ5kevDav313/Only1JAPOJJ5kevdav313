@@ -23,8 +23,8 @@ import {
   type ConnectedGlobalChatUser,
 } from '../../sockets/globalChatSocket';
 import {
-  X,
   Flag,
+  Loader2,
   MessageCircle,
   Radio,
   Wifi,
@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import type { ChatMessage, ChatMention } from '../../types/chats';
 import type { SessionUser } from '../../types/session';
-import type { ToastType } from '../common/Toast';
 import {
   createVoiceChatSocket,
   type VoiceUser,
@@ -42,10 +41,14 @@ import {
 import Button from '../common/Button';
 import Loader from '../common/Loader';
 import Modal from '../common/Modal';
-import Toast from '../common/Toast';
 import VoiceChat from './VoiceChat';
 import { ChatMessageRow, type ChatListMessage } from './ChatMessageRow';
 import { ChatTextComposer } from './ChatTextComposer';
+import { PanelHeader, SidePanel } from '../common/SidePanel';
+import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
+
+const MAX_HEADER_AVATARS = 5;
 
 interface ChatSidebarProps {
   sessionId: string;
@@ -92,14 +95,11 @@ export default function ChatSidebar({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [reportingMessageId, setReportingMessageId] = useState<number | null>(
     null
   );
   const [reportingGlobalMessage, setReportingGlobalMessage] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: ToastType;
-  } | null>(null);
   const [automoddedMessages, setAutomoddedMessages] = useState<
     Map<number, string>
   >(new Map());
@@ -331,11 +331,11 @@ export default function ChatSidebar({
   }, [open]);
 
   useEffect(() => {
-    if (!sessionId || !open || messagesLoaded) return;
+    if (!sessionId || !accessId || !open || messagesLoaded) return;
 
     setLoading(true);
     setErrorMessage(null);
-    fetchChatMessages(sessionId)
+    fetchChatMessages(sessionId, accessId)
       .then((fetchedMessages) => {
         setMessages(fetchedMessages);
         setLoading(false);
@@ -348,7 +348,7 @@ export default function ChatSidebar({
         setLoading(false);
         setMessagesLoaded(true);
       });
-  }, [sessionId, open, messagesLoaded]);
+  }, [sessionId, accessId, open, messagesLoaded]);
 
   // PFATC global chat socket
   useEffect(() => {
@@ -883,24 +883,32 @@ export default function ChatSidebar({
   async function handleSubmitReport() {
     if (!reportingMessageId || !reportReason.trim()) return;
 
+    setSubmittingReport(true);
     try {
       if (reportingGlobalMessage) {
         // AATC disabled — was: if (activeTab === 'aatc') { await reportAATCChatMessage(...) } else { ... }
-        await reportGlobalChatMessage(reportingMessageId, reportReason.trim());
+        await minDuration(
+          reportGlobalChatMessage(reportingMessageId, reportReason.trim())
+        );
       } else {
-        await reportChatMessage(
-          sessionId,
-          reportingMessageId,
-          reportReason.trim()
+        await minDuration(
+          reportChatMessage(
+            sessionId,
+            accessId,
+            reportingMessageId,
+            reportReason.trim()
+          )
         );
       }
-      setToast({ message: 'Message reported successfully.', type: 'success' });
+      toast.success('Message reported successfully.');
       setShowReportModal(false);
       setReportReason('');
       setReportingMessageId(null);
       setReportingGlobalMessage(false);
     } catch {
-      setToast({ message: 'Failed to report message.', type: 'error' });
+      toast.error('Failed to report message.');
+    } finally {
+      setSubmittingReport(false);
     }
   }
 
@@ -1016,36 +1024,88 @@ export default function ChatSidebar({
   );
   const tabCount = sidebarTabs.length;
 
+  const headerUsers =
+    activeTab === 'session'
+      ? sessionUsers
+          .map((sessionUser) => ({
+            sessionUser,
+            inChat: isUserInActiveChat(sessionUser.id, activeChatUsers),
+          }))
+          .sort((a, b) => Number(b.inChat) - Number(a.inChat))
+          .map(({ sessionUser, inChat }) => ({
+            id: sessionUser.id,
+            username: sessionUser.username,
+            avatar: sessionUser.avatar,
+            label: sessionUser.username,
+            ringClass: inChat ? 'border-green-500' : 'border-zinc-500',
+          }))
+      : activeTab === 'pfatc'
+        ? /* AATC disabled — was: activeTab === 'aatc' ? aatcConnectedUsers : */ connectedGlobalChatUsers.map(
+            (globalUser) => ({
+              id: globalUser.id,
+              username: globalUser.username,
+              avatar: globalUser.avatar,
+              label: `${globalUser.username} - ${globalUser.station || 'No Station'}`,
+              ringClass: 'border-blue-500',
+            })
+          )
+        : [];
+  const hiddenHeaderUsers = headerUsers.slice(MAX_HEADER_AVATARS);
+
   return (
-    <div
-      className={`fixed top-0 right-0 h-full w-100 bg-zinc-900 text-white transition-transform duration-300 ${
-        open ? 'translate-x-[] shadow-2xl shadow-black/90' : 'translate-x-full'
-      } rounded-l-3xl border-l-2 border-blue-800 flex flex-col`}
-      style={{ zIndex: 10000 }}
-    >
-      <div className="flex justify-between items-center p-5 border-b border-blue-800 rounded-tl-3xl">
-        <div className="flex items-center gap-3">
-          <span className="font-extrabold text-xl text-blue-300">
-            {
-              activeTab === 'session'
-                ? 'Session Chat'
-                : activeTab === 'voice'
-                  ? 'Voice Chat'
-                  : 'PFATC Chat' /* AATC disabled — was: activeTab === 'aatc' ? 'AATC Chat' : 'PFATC Chat' */
-            }
-          </span>
-        </div>
-        <button
-          onClick={() => onClose()}
-          className="p-1 rounded-full hover:bg-gray-700"
-        >
-          <X className="h-5 w-5 text-gray-400" />
-        </button>
-      </div>
+    <SidePanel open={open}>
+      <PanelHeader
+        icon={
+          activeTab === 'voice'
+            ? Phone
+            : activeTab === 'pfatc'
+              ? Radio
+              : MessageCircle
+        }
+        title={
+          activeTab === 'session'
+            ? 'Session Chat'
+            : activeTab === 'voice'
+              ? 'Voice Chat'
+              : 'PFATC Chat' /* AATC disabled — was: activeTab === 'aatc' ? 'AATC Chat' : 'PFATC Chat' */
+        }
+        onClose={onClose}
+      >
+        {headerUsers.length > 0 ? (
+          <div className="flex items-center -space-x-2">
+            {headerUsers.slice(0, MAX_HEADER_AVATARS).map((headerUser) => (
+              <img
+                key={headerUser.id}
+                src={headerUser.avatar || '/assets/app/default/avatar.webp'}
+                alt={headerUser.username}
+                title={headerUser.label}
+                className={`size-7 rounded-full border-2 bg-zinc-800 ring-2 ring-zinc-900 ${headerUser.ringClass}`}
+                onError={(e) => {
+                  e.currentTarget.src = '/assets/app/default/avatar.webp';
+                }}
+              />
+            ))}
+            {hiddenHeaderUsers.length > 0 && (
+              <span
+                title={hiddenHeaderUsers.map((u) => u.label).join(', ')}
+                className="flex size-7 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold text-zinc-300 ring-2 ring-zinc-900"
+              >
+                +{hiddenHeaderUsers.length}
+              </span>
+            )}
+          </div>
+        ) : (
+          activeTab === 'pfatc' && (
+            <span className="truncate text-xs text-zinc-500">
+              No controllers online
+            </span>
+          )
+        )}
+      </PanelHeader>
 
       {(isPFATC || /* isAdvancedATC || */ sessionId) &&
         tabCount > 0 /* AATC disabled */ && (
-          <div className="border-b border-blue-800 bg-zinc-900 px-4 pb-3 pt-2">
+          <div className="shrink-0 border-b border-blue-800 px-5 py-3">
             <div className="relative flex rounded-full bg-zinc-800/95 p-1 shadow-inner ring-1 ring-zinc-700/60">
               <div
                 className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-linear-to-b from-blue-500 to-blue-700 shadow-md transition-[left,width] duration-300 ease-out"
@@ -1130,63 +1190,6 @@ export default function ChatSidebar({
             </div>
           </div>
         )}
-
-      {activeTab !== 'voice' && (
-        <div className="px-5 py-2 border-b border-blue-800 bg-zinc-900">
-          <div className="flex flex-wrap gap-1">
-            <>
-              {activeTab === 'session' ? (
-                sessionUsers.map((sessionUser) => (
-                  <img
-                    key={sessionUser.id}
-                    src={
-                      sessionUser.avatar || '/assets/app/default/avatar.webp'
-                    }
-                    alt={sessionUser.username}
-                    className={`w-8 h-8 rounded-full border-2 ${
-                      isUserInActiveChat(sessionUser.id, activeChatUsers)
-                        ? 'border-green-500'
-                        : 'border-gray-500'
-                    }`}
-                    title={sessionUser.username}
-                  />
-                ))
-              ) : (
-                <div className="flex flex-wrap gap-1">
-                  {
-                    /* AATC disabled — was: activeTab === 'aatc' ? aatcConnectedUsers : */ connectedGlobalChatUsers.map(
-                      (globalUser) => (
-                        <img
-                          key={globalUser.id}
-                          src={
-                            globalUser.avatar ||
-                            '/assets/app/default/avatar.webp'
-                          }
-                          alt={globalUser.username}
-                          className="w-8 h-8 rounded-full border-2 border-blue-500 shadow-sm"
-                          title={`${globalUser.username} - ${globalUser.station || 'No Station'}`}
-                          onError={(e) => {
-                            e.currentTarget.src =
-                              '/assets/app/default/avatar.webp';
-                          }}
-                        />
-                      )
-                    )
-                  }
-                  {
-                    /* AATC disabled — was: activeTab === 'aatc' ? aatcConnectedUsers : */ connectedGlobalChatUsers.length ===
-                      0 && (
-                      <div className="text-xs text-zinc-400">
-                        No controllers online
-                      </div>
-                    )
-                  }
-                </div>
-              )}
-            </>
-          </div>
-        </div>
-      )}
 
       {/* Session / PFATC text chat */}
       {showTextChat && (
@@ -1322,7 +1325,14 @@ export default function ChatSidebar({
         variant="danger"
         icon={<Flag />}
         footer={
-          <Button onClick={handleSubmitReport} variant="danger">
+          <Button
+            onClick={handleSubmitReport}
+            variant="danger"
+            disabled={submittingReport}
+          >
+            {submittingReport && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Report
           </Button>
         }
@@ -1331,19 +1341,11 @@ export default function ChatSidebar({
           value={reportReason}
           onChange={(e) => setReportReason(e.target.value)}
           placeholder="Enter reason for reporting..."
-          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-800"
+          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:border-red-800"
           maxLength={200}
           rows={4}
         />
       </Modal>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
 
       <style>{`
         .volume-slider::-webkit-slider-thumb {
@@ -1375,6 +1377,6 @@ export default function ChatSidebar({
           z-index: 5;
         }
       `}</style>
-    </div>
+    </SidePanel>
   );
 }

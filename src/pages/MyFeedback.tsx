@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { Star, MessageSquare, Flag } from 'lucide-react';
+import { Star, MessageSquare, Flag, Loader2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Button from '../components/common/Button';
 import ErrorScreen from '../components/common/ErrorScreen';
 import Modal from '../components/common/Modal';
-import Toast from '../components/common/Toast';
 import { useSettings } from '../hooks/settings/useSettings';
 import { fetchBackgrounds } from '../utils/fetch/data';
 import { AdminAreaChart } from '../components/admin/AdminChart';
@@ -20,7 +19,8 @@ import {
   type MyDailyRatingStats,
   type MyRatingDistributionBucket,
 } from '../utils/fetch/ratings';
-import type { ToastType } from '../components/common/Toast';
+import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const MAX_REPORT_REASON_LENGTH = 500;
 
@@ -156,10 +156,6 @@ export default function MyFeedback() {
   const [reportingId, setReportingId] = useState<number | null>(null);
   const [reportReason, setReportReason] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: ToastType;
-  } | null>(null);
 
   const handleReportClick = (id: number) => {
     setReportingId(id);
@@ -170,19 +166,17 @@ export default function MyFeedback() {
     if (!reportingId || !reportReason.trim()) return;
     setSubmittingReport(true);
     try {
-      await reportMyRating(reportingId, reportReason.trim());
+      await minDuration(reportMyRating(reportingId, reportReason.trim()));
       setRatings((prev) =>
         prev.map((r) => (r.id === reportingId ? { ...r, reported: true } : r))
       );
-      setToast({ message: 'Comment reported for review.', type: 'success' });
+      toast.success('Comment reported for review.');
       setReportingId(null);
       setReportReason('');
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to report comment',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to report comment'
+      );
     } finally {
       setSubmittingReport(false);
     }
@@ -609,6 +603,9 @@ export default function MyFeedback() {
             variant="danger"
             disabled={submittingReport || !reportReason.trim()}
           >
+            {submittingReport && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             {submittingReport ? 'Reporting…' : 'Report'}
           </Button>
         }
@@ -617,20 +614,12 @@ export default function MyFeedback() {
           value={reportReason}
           onChange={(e) => setReportReason(e.target.value)}
           placeholder="Enter reason for reporting..."
-          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-red-800 resize-y max-h-48"
+          className="w-full p-2 bg-zinc-800 text-white rounded border border-zinc-700 focus:outline-none focus:border-red-800 resize-y max-h-48"
           maxLength={MAX_REPORT_REASON_LENGTH}
           rows={4}
           disabled={submittingReport}
         />
       </Modal>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 }

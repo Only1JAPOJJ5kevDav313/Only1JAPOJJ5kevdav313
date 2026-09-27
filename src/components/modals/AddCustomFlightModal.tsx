@@ -257,7 +257,7 @@ export default function AddCustomFlightModal({
                   onChange={(value) => handleChange('callsign', value)}
                   placeholder="ABC123"
                   maxLength={16}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500"
                 />
                 {errors.callsign && (
                   <p className="text-red-400 text-xs mt-1">{errors.callsign}</p>
@@ -395,7 +395,7 @@ export default function AddCustomFlightModal({
                   }
                   placeholder={flightType === 'departure' ? 'A12' : 'B5'}
                   maxLength={8}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500"
                 />
               </div>
               <div>
@@ -442,7 +442,7 @@ export default function AddCustomFlightModal({
                   placeholder="2000"
                   maxLength={4}
                   pattern="[0-9]*"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500"
                 />
               </div>
             </div>
@@ -487,7 +487,7 @@ export default function AddCustomFlightModal({
                 onChange={(value) => handleChange('remark', value)}
                 placeholder="Optional notes..."
                 maxLength={50}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-blue-500"
               />
             </div>
           </div>

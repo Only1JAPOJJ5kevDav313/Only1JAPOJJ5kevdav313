@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router';
 import Navbar from '../components/Navbar';
 import WindDisplay from '../components/tools/WindDisplay';
@@ -143,6 +149,51 @@ export default function Submit({
     }
   }, [success, submittedFlight, user]);
 
+  const pendingFlightKey = `submit:pendingFlight:${sessionId}`;
+  const clearPendingFlight = useCallback(() => {
+    try {
+      sessionStorage.removeItem(pendingFlightKey);
+    } catch {
+      // storage unavailable
+    }
+  }, [pendingFlightKey]);
+
+  useEffect(() => {
+    if (!success || !submittedFlight || user) return;
+    try {
+      sessionStorage.setItem(pendingFlightKey, JSON.stringify(submittedFlight));
+    } catch {
+      // storage unavailable
+    }
+  }, [success, submittedFlight, user, pendingFlightKey]);
+
+  const pendingFlightRestored = useRef(false);
+  useEffect(() => {
+    if (!sessionId || !initialLoadComplete || pendingFlightRestored.current) {
+      return;
+    }
+    pendingFlightRestored.current = true;
+
+    let stored: Flight | null = null;
+    try {
+      const raw = sessionStorage.getItem(pendingFlightKey);
+      stored = raw ? (JSON.parse(raw) as Flight) : null;
+    } catch {
+      stored = null;
+    }
+    if (!stored?.id || !stored.acars_token) return;
+
+    fetch(
+      `${API_BASE_URL}/api/flights/${sessionId}/${stored.id}/acars-flight?acars_token=${encodeURIComponent(stored.acars_token)}`
+    )
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((fresh: Flight) => {
+        setSubmittedFlight({ ...stored, ...fresh });
+        setSuccess(true);
+      })
+      .catch(() => clearPendingFlight());
+  }, [sessionId, initialLoadComplete, pendingFlightKey, clearPendingFlight]);
+
   useEffect(() => {
     if (user?.robloxUsername) {
       setForm((f) =>
@@ -193,6 +244,7 @@ export default function Submit({
         submittedFlight.acarsRedirectUrl) &&
       (settings?.acars?.autoRedirectToAcars ?? true)
     ) {
+      clearPendingFlight();
       if (submittedFlight.acarsRedirectUrl) {
         window.location.href = submittedFlight.acarsRedirectUrl;
       } else {
@@ -209,6 +261,7 @@ export default function Submit({
     settings?.acars?.autoRedirectToAcars,
     sessionId,
     goToPath,
+    clearPendingFlight,
     session?.createdBy,
     user?.userId,
   ]);
@@ -511,6 +564,7 @@ export default function Submit({
   };
 
   const handleCreateAnother = () => {
+    clearPendingFlight();
     setSuccess(false);
     setSubmittedFlight(null);
     setShowRating(false);
@@ -649,6 +703,27 @@ export default function Submit({
           <WindDisplay icao={session.airportIcao} />
         </div>
 
+        {!success &&
+          !authLoading &&
+          !user &&
+          hasAdvancedNetworkFeatures(session) && (
+            <div className="mb-6 p-2 bg-gray-900/70 backdrop-blur-md border-2 border-blue-700 rounded-4xl shadow-2xl flex items-center gap-2 text-sm">
+              <TowerControl className="h-5 w-5 shrink-0 text-blue-400 ml-2 mb-0.5" />
+              <p className="flex-1 text-blue-100">
+                Sign in before filing to use ACARS and PDCs.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  window.location.href = `/login?callback=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                }}
+              >
+                Sign in
+              </Button>
+            </div>
+          )}
+
         {/* Controller Rating Popup */}
         {showRating && session?.createdBy && (
           <ControllerRatingPopup
@@ -757,6 +832,7 @@ export default function Submit({
                       <Button
                         onClick={() => {
                           setShowRating(false);
+                          clearPendingFlight();
                           if (submittedFlight.acarsRedirectUrl) {
                             window.location.href =
                               submittedFlight.acarsRedirectUrl;
@@ -836,7 +912,7 @@ export default function Submit({
                       maxLength={16}
                       onFocus={() => setRegistrationFocused(true)}
                       onBlur={() => setRegistrationFocused(false)}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                       style={
                         form.airlineIcao && !registrationFocused
                           ? { filter: 'grayscale(1)' }
@@ -857,7 +933,7 @@ export default function Submit({
                       }
                       placeholder="1234"
                       maxLength={8}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 </div>
@@ -874,7 +950,7 @@ export default function Submit({
                       }
                       placeholder="Optional"
                       maxLength={32}
-                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 )}
@@ -920,7 +996,7 @@ export default function Submit({
                       onChange={(e) => handleChange('stand')(e.target.value)}
                       placeholder="e.g. A12"
                       maxLength={8}
-                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
                 </div>
@@ -962,7 +1038,7 @@ export default function Submit({
                         handleChange('cruisingFL')(e.target.value)
                       }
                       placeholder="e.g. 350"
-                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                      className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                       maxLength={3}
                       required
                     />
@@ -997,7 +1073,7 @@ export default function Submit({
                     }}
                     placeholder="e.g. HAZEL NOVMA LEDGO"
                     maxLength={500}
-                    className="flex items-center w-full pl-6 pr-28 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                    className="flex items-center w-full pl-6 pr-28 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                   />
                   {/* Update 9: route generation disabled — no waypoint data
                       for the new airport roster yet. Re-enable once it's
@@ -1054,7 +1130,7 @@ export default function Submit({
                   onChange={(e) => handleChange('remark')(e.target.value)}
                   placeholder="Any additional information"
                   maxLength={255}
-                  className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                  className="flex items-center w-full pl-6 p-3 bg-gray-800 border-2 border-blue-600 rounded-full text-white font-semibold focus:outline-none focus:border-blue-400 transition-all"
                 />
               </div>
 

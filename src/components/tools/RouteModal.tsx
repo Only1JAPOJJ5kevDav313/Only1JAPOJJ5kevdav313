@@ -289,7 +289,7 @@ export default function RouteModal({
         <textarea
           value={editedRoute}
           onChange={(e) => handleRouteChange(e.target.value)}
-          className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-3 text-white font-mono text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          className="w-full bg-zinc-800 border border-zinc-600 rounded-lg p-3 text-white font-mono text-sm leading-relaxed resize-none focus:outline-none focus:border-blue-600"
           placeholder="Enter route…"
           rows={4}
         />

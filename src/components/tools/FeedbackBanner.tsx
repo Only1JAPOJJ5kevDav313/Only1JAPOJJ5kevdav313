@@ -10,7 +10,7 @@ import {
 import { submitFeedback } from '../../utils/fetch/feedback';
 import { Portal } from './Portal';
 import Button from '../common/Button';
-import Toast from '../common/Toast';
+import { toast } from 'sonner';
 
 interface FeedbackBannerProps {
   isOpen: boolean;
@@ -24,10 +24,6 @@ export default function FeedbackBanner({
   const [rating, setRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [showDetailedModal, setShowDetailedModal] = useState(false);
   const [detailedRatings, setDetailedRatings] = useState({
     userInterface: 0,
@@ -142,13 +138,11 @@ export default function FeedbackBanner({
       }, 1500);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      setToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to submit feedback. Please try again later.',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to submit feedback. Please try again later.'
+      );
       setIsSubmitting(false);
     }
   };
@@ -175,13 +169,11 @@ export default function FeedbackBanner({
       }, 1500);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      setToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to submit feedback. Please try again later.',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to submit feedback. Please try again later.'
+      );
       setIsSubmitting(false);
     }
   };
@@ -804,14 +796,6 @@ export default function FeedbackBanner({
               {MobileFeedback}
             </div>
           </>
-        )}
-
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
         )}
       </div>
     </Portal>

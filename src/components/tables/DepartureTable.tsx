@@ -16,7 +16,7 @@ import type { DepartureTableColumnSettings } from '../../types/settings';
 import type { FieldEditingState } from '../../sockets/sessionUsersSocket';
 import { useData } from '../../hooks/data/useData';
 import { parseCallsign } from '../../utils/callsignParser';
-import Checkbox from '../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import TextInput from '../common/TextInput';
 import AirportDropdown from '../dropdowns/AirportDropdown';
 import RunwayDropdown from '../dropdowns/RunwayDropdown';
@@ -1379,14 +1379,13 @@ function DepartureTable({
                       <td className="py-2 px-4 column-clearance">
                         <Checkbox
                           checked={isClearanceChecked(flight.clearance)}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             handleToggleClearance(
                               flight.id,
                               !isClearanceChecked(flight.clearance)
                             )
                           }
-                          label=""
-                          checkedClass="bg-green-600 border-green-600"
+                          className="data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-600"
                         />
                       </td>
                     )}

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  Check,
   Building2,
   Plane,
   Globe,
@@ -22,8 +23,11 @@ import {
   ScrollText,
   Trash2,
   Radar,
+  Lock,
+  Flag,
   type LucideIcon,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface ScopeCatalogEntry {
   id: string;
@@ -57,6 +61,8 @@ const SCOPE_ICONS: Record<string, LucideIcon> = {
   'ratings.controller_stats': BarChart3,
   'notifications.read': Bell,
   'flight_logs.read': ScrollText,
+  'flights.network_manage': PencilLine,
+  'sessions.network_claim': Flag,
 };
 
 interface ScopeTagSelectorProps {
@@ -64,8 +70,15 @@ interface ScopeTagSelectorProps {
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
   readOnly?: boolean;
+  locked?: Set<string>;
+  lockedLabel?: string;
   className?: string;
   appearance?: 'dark' | 'light';
+}
+
+function groupLabel(group: string) {
+  const text = group.replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export default function ScopeTagSelector({
@@ -73,10 +86,10 @@ export default function ScopeTagSelector({
   selected,
   onChange,
   readOnly = false,
+  locked,
+  lockedLabel = 'Locked',
   className = '',
-  appearance = 'dark',
 }: ScopeTagSelectorProps) {
-  const light = appearance === 'light';
   const groups = useMemo(() => {
     const m = new Map<string, ScopeCatalogEntry[]>();
     for (const c of catalog) {
@@ -89,7 +102,7 @@ export default function ScopeTagSelector({
   }, [catalog]);
 
   const toggle = (id: string) => {
-    if (readOnly) return;
+    if (readOnly || locked?.has(id)) return;
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -98,64 +111,69 @@ export default function ScopeTagSelector({
 
   if (groups.length === 0) {
     return (
-      <p
-        className={`text-sm py-2 ${light ? 'text-slate-500' : 'text-zinc-500'}`}
-      >
-        No scopes available.
-      </p>
+      <p className="py-2 text-sm text-muted-foreground">No scopes available.</p>
     );
   }
 
-  const groupLabelClass = light
-    ? 'text-[10px] font-semibold uppercase tracking-widest text-sky-800/55 mb-2'
-    : 'text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2';
-
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={cn('flex flex-col gap-4', className)}>
       {groups.map(([group, entries]) => (
-        <div key={group}>
-          <p className={groupLabelClass}>{group}</p>
-          <div className="flex flex-wrap gap-2">
+        <div key={group} className="grid gap-1.5">
+          <p className="px-2 text-xs font-medium text-muted-foreground">
+            {groupLabel(group)}
+          </p>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
             {entries.map((c) => {
-              const active = selected.has(c.id);
+              const isLocked = locked?.has(c.id) ?? false;
+              const active = isLocked || selected.has(c.id);
               const Icon = SCOPE_ICONS[c.id];
-              const chipClass = light
-                ? [
-                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-150 border',
-                    readOnly ? 'cursor-default' : 'cursor-pointer',
-                    active
-                      ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/10'
-                      : readOnly
-                        ? 'bg-slate-100/80 text-slate-500 border-slate-200'
-                        : 'bg-white/90 text-slate-700 border-slate-200 hover:border-sky-300 hover:bg-white',
-                  ].join(' ')
-                : [
-                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all duration-150 border',
-                    readOnly ? 'cursor-default' : 'cursor-pointer',
-                    active
-                      ? 'bg-zinc-700 text-zinc-50 border-zinc-600'
-                      : readOnly
-                        ? 'bg-transparent text-zinc-600 border-zinc-800'
-                        : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-zinc-200',
-                  ].join(' ');
-              const iconClass = light
-                ? active
-                  ? 'text-white'
-                  : 'text-slate-500'
-                : active
-                  ? 'text-zinc-300'
-                  : 'text-zinc-600';
               return (
                 <button
                   key={c.id}
                   type="button"
-                  title={c.description}
+                  title={
+                    isLocked
+                      ? `${lockedLabel}: ${c.description}`
+                      : c.description
+                  }
                   onClick={() => toggle(c.id)}
-                  disabled={readOnly}
-                  className={chipClass}
+                  disabled={readOnly || isLocked}
+                  aria-pressed={active}
+                  className={cn(
+                    'flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    active ? 'text-foreground' : 'text-muted-foreground',
+                    readOnly || isLocked
+                      ? 'cursor-default'
+                      : 'cursor-pointer hover:bg-muted/60 hover:text-foreground'
+                  )}
                 >
-                  {Icon && <Icon className={`w-3 h-3 shrink-0 ${iconClass}`} />}
-                  {c.label}
+                  <span
+                    className={cn(
+                      'flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors',
+                      active
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input dark:bg-input/30'
+                    )}
+                    aria-hidden
+                  >
+                    {isLocked ? (
+                      <Lock className="size-3" />
+                    ) : active ? (
+                      <Check className="size-3.5" />
+                    ) : null}
+                  </span>
+                  {Icon ? (
+                    <Icon
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                  ) : null}
+                  <span className="truncate">{c.label}</span>
+                  {isLocked ? (
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                      {lockedLabel}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

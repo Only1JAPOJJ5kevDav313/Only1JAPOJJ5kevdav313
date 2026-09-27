@@ -1,5 +1,9 @@
 import { Server as SocketServer } from 'socket.io';
-import { updateFlight, getFlightById } from '../db/flights.js';
+import {
+  updateFlight,
+  getFlightById,
+  dropUnchangedFlightFields,
+} from '../db/flights.js';
 import { getUserById } from '../db/users.js';
 import {
   getOverviewForClient,
@@ -26,6 +30,7 @@ import type { Server as HTTPServer } from 'http';
 import type { SessionUsersServer } from './sessionUsersWebsocket.js';
 import type { Flight } from '../utils/flightUtils.js';
 import { createHandshakeRateLimiter } from './handshakeRateLimit.js';
+import { getSocketUser } from './socketAuth.js';
 
 let io: SocketServer;
 const activeOverviewClients = new Set<string>();
@@ -61,23 +66,25 @@ export function setupOverviewWebsocket(
   io.on('connection', async (socket) => {
     activeOverviewClients.add(socket.id);
 
-    const userId = socket.handshake.query.userId as string;
     const isEventControllerFlag =
       socket.handshake.query.isEventController === 'true';
 
-    if (isEventControllerFlag && userId) {
-      const canPfatc = await isPFATCSectorController(userId);
+    if (isEventControllerFlag) {
+      // Identity comes only from the verified auth cookie, never the query.
+      const socketUser = await getSocketUser(socket);
+      const canPfatc = socketUser
+        ? await isPFATCSectorController(socketUser.userId)
+        : false;
       // AATC disabled — canAatc always false
       const canAatc = false; // was: await isAATCSectorController(userId)
 
-      if (canPfatc || canAatc) {
+      if (socketUser && (canPfatc || canAatc)) {
         eventControllerClients.add(socket.id);
         socket.data.isEventController = true;
         socket.data.canEditPfatc = canPfatc;
         socket.data.canEditAatc = false; // AATC disabled
-        socket.data.userId = userId;
-        socket.data.username =
-          (socket.handshake.query.username as string) || 'Unknown';
+        socket.data.userId = socketUser.userId;
+        socket.data.username = socketUser.username;
       }
     }
 
@@ -138,6 +145,15 @@ export function setupOverviewWebsocket(
               action: 'update',
               flightId,
               error: 'Advanced ATC (AATC) network is not currently available',
+            });
+            return;
+          }
+          // Event controllers may only act on network sessions, never private ones
+          if (!session.is_pfatc) {
+            socket.emit('flightError', {
+              action: 'update',
+              flightId,
+              error: 'Not authorized',
             });
             return;
           }
@@ -204,10 +220,16 @@ export function setupOverviewWebsocket(
             flightId as string
           );
 
+          const changes = dropUnchangedFlightFields(oldFlight, updates);
+          if (Object.keys(changes).length === 0) {
+            socket.emit('flightUpdateAck', { flightId, updates });
+            return;
+          }
+
           const updatedFlight = await updateFlight(
             validSessionId,
             flightId as string,
-            updates
+            changes
           );
 
           if (updatedFlight) {
@@ -326,6 +348,14 @@ export function setupOverviewWebsocket(
               action: 'contactMe',
               flightId,
               error: 'Advanced ATC (AATC) network is not currently available',
+            });
+            return;
+          }
+          if (!session.is_pfatc) {
+            socket.emit('flightError', {
+              action: 'contactMe',
+              flightId,
+              error: 'Not authorized',
             });
             return;
           }
