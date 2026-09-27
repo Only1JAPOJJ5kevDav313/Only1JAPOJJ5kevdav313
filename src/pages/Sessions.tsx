@@ -3,6 +3,8 @@ import { Link } from 'react-router';
 import {
   AlertTriangle,
   Calendar,
+  Check,
+  Copy,
   FolderOpen,
   Hash,
   Info,
@@ -27,6 +29,7 @@ import {
 } from '../utils/fetch/sessions';
 import type { SessionInfo } from '../types/session';
 import { Button } from '@/components/ui/button';
+import { minDuration } from '@/lib/minDuration';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -102,60 +105,95 @@ function SessionCard({
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(session.sessionId);
+      setCopied(true);
+      toast.success('Session ID copied');
+    } catch {
+      toast.error('Could not copy the session ID');
+    }
+  };
+
   return (
-    <div className="relative">
-      <Link
-        to={`/view/${session.sessionId}/?accessId=${session.accessId}`}
-        className="flex h-full flex-col overflow-hidden rounded-3xl border-2 border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-700 hover:bg-zinc-800/60"
-      >
-        <div className="flex min-w-0 items-center gap-3 pt-4 pr-36 pb-3 pl-5">
-          <FolderOpen className="size-5 shrink-0 text-blue-400" />
-          <span className="truncate font-medium">{sessionName(session)}</span>
-          {session.isLegacy && (
-            <Info
-              aria-label="Legacy session"
-              className="size-4 shrink-0 text-amber-400"
-            />
-          )}
-        </div>
-        <div className="flex flex-1 flex-col gap-2.5 px-5 pb-4 text-sm text-zinc-300 [&_svg]:text-zinc-500">
-          <span className="flex min-w-0 items-center gap-2">
-            <Hash className="size-4 shrink-0" />
-            <span className="truncate font-mono">{session.sessionId}</span>
-          </span>
-          <span className="flex items-center gap-2">
-            <Calendar className="size-4 shrink-0" />
-            {session.createdAt
-              ? new Date(session.createdAt).toLocaleString()
-              : 'Date unavailable'}
-          </span>
-          {session.activeRunway && (
-            <span className="flex items-center gap-2">
-              <PlaneTakeoff className="size-4 shrink-0" />
-              Departure runway
-              <span className="font-mono font-medium text-foreground">
-                {session.activeRunway}
-              </span>
-            </span>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-3 px-5 pb-4">
-          <SessionTypeLabel
-            isAdvancedATC={session.isAdvancedATC}
-            isPFATC={session.isPFATC}
+    <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border-2 border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-700 hover:bg-zinc-800/60 has-[a:focus-visible]:border-ring">
+      <div className="flex min-w-0 items-center gap-3 pt-4 pr-36 pb-3 pl-5">
+        <FolderOpen className="size-5 shrink-0 text-blue-400" />
+        <Link
+          to={`/view/${session.sessionId}/?accessId=${session.accessId}`}
+          className="truncate font-medium outline-none after:absolute after:inset-0"
+        >
+          {sessionName(session)}
+        </Link>
+        {session.isLegacy && (
+          <Info
+            aria-label="Legacy session"
+            className="size-4 shrink-0 text-amber-400"
           />
-          <span className="flex items-center gap-1.5 text-sm text-zinc-300 tabular-nums [&_svg]:text-zinc-500">
-            <Plane className="size-4" />
-            {session.flightCount}{' '}
-            {session.flightCount === 1 ? 'flight' : 'flights'}
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2.5 px-5 pb-4 text-sm text-zinc-300 [&_svg]:text-zinc-500">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={copyId}
+              aria-label={`Copy session ID ${session.sessionId}`}
+              className="group/id relative z-10 -mx-1.5 -my-0.5 flex max-w-full min-w-0 cursor-pointer items-center gap-2 self-start rounded-md px-1.5 py-0.5 transition-colors outline-none hover:bg-zinc-800 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Hash className="size-4 shrink-0" />
+              <span className="truncate font-mono">{session.sessionId}</span>
+              {copied ? (
+                <Check className="size-3.5 shrink-0 text-emerald-400!" />
+              ) : (
+                <Copy className="size-3.5 shrink-0 opacity-0 transition-opacity group-hover/id:opacity-100 group-focus-visible/id:opacity-100" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="shadcn-scope" sideOffset={6}>
+            {copied ? 'Copied!' : 'Copy session ID'}
+          </TooltipContent>
+        </Tooltip>
+        <span className="flex items-center gap-2">
+          <Calendar className="size-4 shrink-0" />
+          {session.createdAt
+            ? new Date(session.createdAt).toLocaleString()
+            : 'Date unavailable'}
+        </span>
+        {session.activeRunway && (
+          <span className="flex items-center gap-2">
+            <PlaneTakeoff className="size-4 shrink-0" />
+            Departure runway
+            <span className="font-mono font-medium text-foreground">
+              {session.activeRunway}
+            </span>
           </span>
-        </div>
-      </Link>
-      <div className="absolute top-3 right-3 flex gap-1.5">
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-3 px-5 pb-4">
+        <SessionTypeLabel
+          isAdvancedATC={session.isAdvancedATC}
+          isPFATC={session.isPFATC}
+        />
+        <span className="flex items-center gap-1.5 text-sm text-zinc-300 tabular-nums [&_svg]:text-zinc-500">
+          <Plane className="size-4" />
+          {session.flightCount}{' '}
+          {session.flightCount === 1 ? 'flight' : 'flights'}
+        </span>
+      </div>
+      <div className="absolute top-3 right-3 z-10 flex gap-1.5">
         <Button
           variant="ghost"
           size="sm"
-          className="border-2 border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-blue-600"
+          className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-blue-600"
           onClick={onRename}
         >
           <Pencil />
@@ -167,7 +205,7 @@ function SessionCard({
               variant="ghost"
               size="icon-sm"
               aria-label="Delete session"
-              className="border-2 border-red-600 text-red-400 hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-red-600"
+              className="border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white focus-visible:bg-red-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-red-600"
               onClick={onDelete}
             >
               <Trash2 />
@@ -240,9 +278,8 @@ export default function Sessions() {
     }
     setSavingName(true);
     try {
-      const { customName } = await updateSessionName(
-        renameTarget.sessionId,
-        name
+      const { customName } = await minDuration(
+        updateSessionName(renameTarget.sessionId, name)
       );
       setSessions((prev) =>
         prev.map((s) =>
@@ -266,7 +303,7 @@ export default function Sessions() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deleteSession(deleteTarget.sessionId);
+      await minDuration(deleteSession(deleteTarget.sessionId));
       setSessions((prev) =>
         prev.filter((s) => s.sessionId !== deleteTarget.sessionId)
       );

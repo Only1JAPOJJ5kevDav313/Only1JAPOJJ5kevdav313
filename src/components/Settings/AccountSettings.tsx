@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { minDuration } from '@/lib/minDuration';
 
 interface AccountSettingsProps {
   settings: Settings | null;
@@ -114,6 +115,8 @@ export default function AccountSettings({
   const [showRobloxConfirm, setShowRobloxConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [unlinking, setUnlinking] = useState<'vatsim' | 'roblox' | null>(null);
+  const [restartingTutorial, setRestartingTutorial] = useState(false);
   const isVatsimLinked = !!(
     user?.vatsimCid ||
     user?.vatsimRatingShort ||
@@ -187,13 +190,13 @@ export default function AccountSettings({
 
   const handleUnlinkVatsim = async () => {
     setShowVatsimConfirm(false);
+    setUnlinking('vatsim');
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_URL}/api/auth/vatsim/unlink`,
-        {
+      const res = await minDuration(
+        fetch(`${import.meta.env.VITE_SERVER_URL}/api/auth/vatsim/unlink`, {
           method: 'POST',
           credentials: 'include',
-        }
+        })
       );
       if (res.ok) {
         await refreshUser();
@@ -203,18 +206,20 @@ export default function AccountSettings({
     } catch (e) {
       console.error('Unlink VATSIM error:', e);
       toast.error('Failed to unlink VATSIM account');
+    } finally {
+      setUnlinking(null);
     }
   };
 
   const handleUnlinkRoblox = async () => {
     setShowRobloxConfirm(false);
+    setUnlinking('roblox');
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_URL}/api/auth/roblox/unlink`,
-        {
+      const res = await minDuration(
+        fetch(`${import.meta.env.VITE_SERVER_URL}/api/auth/roblox/unlink`, {
           method: 'POST',
           credentials: 'include',
-        }
+        })
       );
 
       if (res.ok) {
@@ -225,12 +230,15 @@ export default function AccountSettings({
     } catch (error) {
       console.error('Error unlinking Roblox:', error);
       toast.error('Failed to unlink Roblox account');
+    } finally {
+      setUnlinking(null);
     }
   };
 
   const handleRestartTutorial = async () => {
+    setRestartingTutorial(true);
     try {
-      const success = await updateTutorialStatus(false);
+      const success = await minDuration(updateTutorialStatus(false));
       if (success) {
         await refreshUser();
         navigate('/?tutorial=true');
@@ -239,6 +247,8 @@ export default function AccountSettings({
       }
     } catch (error) {
       console.error('Error resetting tutorial:', error);
+    } finally {
+      setRestartingTutorial(false);
     }
   };
 
@@ -335,8 +345,13 @@ export default function AccountSettings({
             <Button
               variant="outline"
               onClick={() => setShowRobloxConfirm(true)}
+              disabled={unlinking === 'roblox'}
             >
-              <Unlink />
+              {unlinking === 'roblox' ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Unlink />
+              )}
               Unlink
             </Button>
           ) : (
@@ -372,8 +387,13 @@ export default function AccountSettings({
               <Button
                 variant="outline"
                 onClick={() => setShowVatsimConfirm(true)}
+                disabled={unlinking === 'vatsim'}
               >
-                <Unlink />
+                {unlinking === 'vatsim' ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Unlink />
+                )}
                 Unlink
               </Button>
             </>
@@ -394,8 +414,16 @@ export default function AccountSettings({
           label="Tutorial"
           description="Walk through the PFControl features again."
         >
-          <Button variant="outline" onClick={handleRestartTutorial}>
-            <RotateCcw />
+          <Button
+            variant="outline"
+            onClick={handleRestartTutorial}
+            disabled={restartingTutorial}
+          >
+            {restartingTutorial ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <RotateCcw />
+            )}
             Restart
           </Button>
         </SettingsRow>

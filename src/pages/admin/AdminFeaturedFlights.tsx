@@ -86,6 +86,7 @@ export default function AdminFeaturedFlights() {
       await fn();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Action failed');
+      throw e;
     } finally {
       setBusyKeys((prev) => {
         const next = new Set(prev);
@@ -97,20 +98,18 @@ export default function AdminFeaturedFlights() {
 
   const handleUnfeature = useCallback(
     async (userId: string, flightId: string) => {
-      if (
-        !(await confirm({
-          title: 'Unfeature this flight?',
-          description:
-            'It will disappear from the user’s public profile immediately.',
-          confirmText: 'Unfeature',
-          destructive: true,
-        }))
-      )
-        return;
-      void withBusy(`unfeature:${flightId}`, async () => {
-        await adminUnfeatureFlight(userId, flightId);
-        setFlights((prev) => prev.filter((f) => f.id !== flightId));
-        toast.success('Flight unfeatured');
+      await confirm({
+        title: 'Unfeature this flight?',
+        description:
+          'It will disappear from the user’s public profile immediately.',
+        confirmText: 'Unfeature',
+        destructive: true,
+        action: () =>
+          withBusy(`unfeature:${flightId}`, async () => {
+            await adminUnfeatureFlight(userId, flightId);
+            setFlights((prev) => prev.filter((f) => f.id !== flightId));
+            toast.success('Flight unfeatured');
+          }),
       });
     },
     [confirm, withBusy]
@@ -118,30 +117,28 @@ export default function AdminFeaturedFlights() {
 
   const handleDeleteImage = useCallback(
     async (userId: string, flightId: string, cephieId: string) => {
-      if (
-        !(await confirm({
-          title: 'Delete this image?',
-          description: 'This cannot be undone.',
-          confirmText: 'Delete',
-          destructive: true,
-        }))
-      )
-        return;
-      void withBusy(`image:${cephieId}`, async () => {
-        await adminDeleteFeaturedFlightImage(userId, flightId, cephieId);
-        setFlights((prev) =>
-          prev.map((f) =>
-            f.id !== flightId
-              ? f
-              : {
-                  ...f,
-                  snapImages: f.snapImages.filter(
-                    (s) => s.cephie_id !== cephieId
-                  ),
-                }
-          )
-        );
-        toast.success('Image deleted');
+      await confirm({
+        title: 'Delete this image?',
+        description: 'This cannot be undone.',
+        confirmText: 'Delete',
+        destructive: true,
+        action: () =>
+          withBusy(`image:${cephieId}`, async () => {
+            await adminDeleteFeaturedFlightImage(userId, flightId, cephieId);
+            setFlights((prev) =>
+              prev.map((f) =>
+                f.id !== flightId
+                  ? f
+                  : {
+                      ...f,
+                      snapImages: f.snapImages.filter(
+                        (s) => s.cephie_id !== cephieId
+                      ),
+                    }
+              )
+            );
+            toast.success('Image deleted');
+          }),
       });
     },
     [confirm, withBusy]

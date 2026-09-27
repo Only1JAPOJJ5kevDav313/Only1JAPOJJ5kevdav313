@@ -1,6 +1,21 @@
-import { useState } from 'react';
-import { Copy, Check, Loader2 } from 'lucide-react';
-import Button from '../common/Button';
+import { useEffect, useState } from 'react';
+import { Check, Copy, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { minDuration } from '@/lib/minDuration';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type AtisReminderNetworkKind = 'pfatc' | 'advanced_atc';
 
@@ -18,6 +33,13 @@ interface AtisReminderModalProps {
   networkSessionKind: AtisReminderNetworkKind;
 }
 
+const CONTROL_SUFFIX: Record<string, string> = {
+  APP: 'Approach',
+  TWR: 'Tower',
+  GND: 'Ground',
+  DEL: 'Delivery',
+};
+
 export default function AtisReminderModal({
   onContinue,
   atisText,
@@ -33,131 +55,119 @@ export default function AtisReminderModal({
   const isAdvancedAtc = networkSessionKind === 'advanced_atc';
   const submitLink = `${window.location?.origin}/submit/${sessionId}`;
   const [copied, setCopied] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const getFormattedControlName = () => {
-    if (!airportControlName) return null;
-    if (airportFrequencyType === 'APP') {
-      if (airportIcao === 'EGKK') {
-        return `${airportControlName} Director`;
-      }
-      return `${airportControlName} Approach`;
-    } else if (airportFrequencyType === 'TWR') {
-      return `${airportControlName} Tower`;
-    } else if (airportFrequencyType === 'GND') {
-      return `${airportControlName} Ground`;
-    } else if (airportFrequencyType === 'DEL') {
-      return `${airportControlName} Delivery`;
+  const [continuing, setContinuing] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  const suffix =
+    airportFrequencyType === 'APP' && airportIcao === 'EGKK'
+      ? 'Director'
+      : CONTROL_SUFFIX[airportFrequencyType];
+  const formattedControlName =
+    airportControlName && suffix ? `${airportControlName} ${suffix}` : null;
+
+  const header = formattedControlName
+    ? `${airportIcao}_${airportFrequencyType} "${formattedControlName}" (${airportAppFrequency})`
+    : `${airportIcao}_${airportFrequencyType} (${airportAppFrequency})`;
+  const formattedAtis = `${header}: <@${userId}>\n\n${atisText}\n\n${submitLink}`;
+  const clipboardText = `${airportName}\n\n${formattedAtis}`;
+
+  const copyAtis = async () => {
+    try {
+      await navigator.clipboard.writeText(clipboardText);
+      return true;
+    } catch {
+      toast.error('Could not copy the ATIS');
+      return false;
     }
-    return null;
   };
 
-  const formattedControlName = getFormattedControlName();
-
-  const formattedAtis = formattedControlName
-    ? `${airportIcao}_${airportFrequencyType} "${formattedControlName}" (${airportAppFrequency}): <@${userId}>\n\n${atisText}\n\n${submitLink}`
-    : `${airportIcao}_${airportFrequencyType} (${airportAppFrequency}): <@${userId}>\n\n${atisText}\n\n${submitLink}`;
-
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(`${airportName}\n\n${formattedAtis}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+    if (await copyAtis()) setCopied(true);
   };
 
   const handleCopyAndContinue = async () => {
-    if (isLoading || copied) return;
-
-    try {
-      await navigator.clipboard.writeText(`${airportName}\n\n${formattedAtis}`);
-      setCopied(true);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-
-    setTimeout(() => {
-      setIsLoading(true);
-      setTimeout(() => {
-        onContinue();
-      }, 1000);
-    }, 500);
+    if (continuing) return;
+    setContinuing(true);
+    await minDuration(
+      navigator.clipboard.writeText(clipboardText).catch(() => {})
+    );
+    onContinue();
   };
 
-  const accentTitle = 'text-blue-400';
-  const accentBorder = 'border-zinc-500/50';
-  const accentLabel = 'text-blue-400';
-  const buttonClass = 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800';
-
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div
-        className={`bg-gradient-to-b from-zinc-900 to-zinc-950 border-2 ${accentBorder} rounded-4xl p-6 max-w-2xl w-full`}
+    <Dialog open>
+      <DialogContent
+        showCloseButton={false}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        className="shadcn-scope gap-4 rounded-4xl border-2 border-zinc-800 bg-zinc-900 p-5 sm:max-w-2xl"
       >
-        <h2 className={`text-3xl font-bold ${accentTitle} mb-4`}>
-          {isAdvancedAtc
-            ? 'Advanced ATC ATIS format reminder'
-            : 'PFATC Network ATIS format reminder'}
-        </h2>
-
-        <p className="text-gray-300 mb-6">
-          {isAdvancedAtc ? (
-            <>
-              For an <strong className="text-blue-300">Advanced ATC</strong>{' '}
-              session, use the same public-network ATIS layout as PFATC (shown
-              below) so pilots and overview stay consistent.
-            </>
-          ) : (
-            <>
-              If you want to use this on the{' '}
-              <strong className="text-blue-300">PFATC Network</strong>, use the
-              ATIS format below:
-            </>
-          )}
-        </p>
-
-        <div className="relative bg-zinc-950 border border-zinc-700 rounded-lg p-4 mb-6 font-mono text-sm text-gray-300 overflow-x-auto">
-          <button
-            onClick={handleCopy}
-            className="absolute top-2 right-2 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-            title="Copy ATIS"
-          >
-            {copied ? (
-              <Check className="w-4 h-4 text-green-400" />
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">
+            {isAdvancedAtc
+              ? 'Advanced ATC ATIS format reminder'
+              : 'PFATC Network ATIS format reminder'}
+          </DialogTitle>
+          <DialogDescription className="text-zinc-400">
+            {isAdvancedAtc ? (
+              <>
+                For an{' '}
+                <span className="font-medium text-blue-400">Advanced ATC</span>{' '}
+                session, use the same public-network ATIS layout as PFATC (shown
+                below) so pilots and overview stay consistent.
+              </>
             ) : (
-              <Copy className="w-4 h-4 text-gray-400" />
+              <>
+                If you want to use this on the{' '}
+                <span className="font-medium text-blue-400">PFATC Network</span>
+                , use the ATIS format below:
+              </>
             )}
-          </button>
-          <div className={`${accentLabel} font-bold mb-3`}>{airportName}</div>
-          <pre className="whitespace-pre-wrap break-words pr-10">
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative min-w-0 rounded-2xl border-2 border-zinc-800 bg-zinc-950 p-4 font-mono text-sm text-zinc-300">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Copy ATIS"
+                  onClick={handleCopy}
+                  className="absolute top-3 right-3 border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-blue-600"
+                >
+                  {copied ? <Check /> : <Copy />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="shadcn-scope" sideOffset={6}>
+                {copied ? 'Copied!' : 'Copy ATIS'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="mb-2 pr-10 font-bold text-blue-400">
+            {airportName}
+          </div>
+          <pre className="max-h-[50vh] overflow-y-auto pr-10 break-words whitespace-pre-wrap">
             {formattedAtis}
           </pre>
         </div>
 
         <Button
+          size="lg"
+          className="h-11 w-full rounded-xl"
           onClick={handleCopyAndContinue}
-          disabled={isLoading || copied}
-          className={`w-full ${buttonClass} disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+          disabled={continuing}
         >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Loading session...</span>
-            </>
-          ) : copied ? (
-            <>
-              <Check className="w-4 h-4" />
-              <span>ATIS Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-4 h-4" />
-              <span>Copy and Continue to Session</span>
-            </>
-          )}
+          {continuing && <Loader2 className="animate-spin" />}
+          Copy and continue to session
         </Button>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

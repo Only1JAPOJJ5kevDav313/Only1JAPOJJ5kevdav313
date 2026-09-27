@@ -275,6 +275,10 @@ body {
   animation: dev-refresh-spin-once 0.65s ease-out forwards;
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

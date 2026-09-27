@@ -10,11 +10,13 @@ import {
 } from 'lucide-react';
 import { fetchMetar } from '../../utils/fetch/metar';
 import type { MetarData } from '../../types/metar';
+import { cn } from '@/lib/utils';
 
 interface WindDisplayProps {
   icao: string | null;
   forceHide?: boolean;
   size?: 'normal' | 'small';
+  className?: string;
 }
 
 // Airports with no METAR station of their own — nearest reporting station
@@ -44,6 +46,7 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
   icao,
   forceHide = false,
   size = 'normal',
+  className,
 }) => {
   const [metarData, setMetarData] = useState<MetarData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -276,11 +279,14 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
   if (isLoading) {
     return (
       <div
-        className={`flex items-center text-sm text-gray-400 gap-2 px-3 py-4 pl-5 ${
-          size === 'small'
-            ? 'bg-gray-800 border-gray-700'
-            : 'bg-gray-900 border-gray-800'
-        } rounded-3xl border ${size === 'small' ? 'text-xs px-2 py-1' : ''}`}
+        className={cn(
+          `flex items-center text-sm text-gray-400 gap-2 px-3 py-4 pl-5 ${
+            size === 'small'
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-gray-900 border-gray-800'
+          } rounded-3xl border ${size === 'small' ? 'text-xs px-2 py-1' : ''}`,
+          size !== 'small' && className
+        )}
       >
         <Loader2
           className={`animate-spin ${size === 'small' ? 'h-3 w-3' : 'h-4 w-4'}`}
@@ -293,15 +299,19 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
   if (!metarData) {
     return (
       <div
-        className={`flex items-center justify-between text-sm px-3 py-4 bg-gray-900 rounded-full border border-gray-800 ${
-          size === 'small' ? 'text-xs px-2 py-2' : ''
-        }`}
+        className={cn(
+          `flex items-center justify-between text-sm px-3 py-4 bg-gray-900 rounded-full border border-gray-800 ${
+            size === 'small' ? 'text-xs px-2 py-2' : ''
+          }`,
+          size !== 'small' && className
+        )}
       >
         <div className="flex items-center gap-2 text-red-400 ml-2">
           <AlertTriangle className={size === 'small' ? 'h-3 w-3' : 'h-4 w-4'} />
           <span>{error || 'No data available'}</span>
         </div>
         <button
+          type="button"
           onClick={handleManualRefresh}
           className="text-blue-400 hover:text-blue-300 transition-colors mr-2 ml-2"
           title="Retry"
@@ -341,6 +351,7 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
           <div className="h-5 border-l border-gray-700 mx-2" />
 
           <button
+            type="button"
             onClick={togglePressureFormat}
             className={`flex items-center gap-1 font-mono transition-colors ${
               showAltimeter
@@ -405,7 +416,10 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
   return (
     <div
       id="wind-display"
-      className="flex flex-col rounded-3xl border border-gray-800 px-4 py-3.5 bg-gray-900"
+      className={cn(
+        'flex flex-col rounded-3xl border border-gray-800 px-4 py-3.5 bg-gray-900',
+        className
+      )}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -425,6 +439,7 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
 
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={togglePressureFormat}
             className="flex items-center gap-1.5 transition-colors"
             title={`Click to toggle to ${showAltimeter ? 'QNH' : 'altimeter setting'}`}
@@ -454,7 +469,7 @@ const WindDisplay: React.FC<WindDisplayProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-700">
+      <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
           {refreshMiss && (
             <span

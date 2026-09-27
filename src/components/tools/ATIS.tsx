@@ -5,7 +5,7 @@ import { fetchMetar } from '../../utils/fetch/metar';
 import { generateATIS } from '../../utils/fetch/atis';
 import { fetchSession } from '../../utils/fetch/sessions';
 import type { Socket } from 'socket.io-client';
-import Checkbox from '../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import Button from '../common/Button';
 import {
   PanelBody,
@@ -511,18 +511,23 @@ export default function ATIS({
                     {runway}
                   </span>
                   <div className="flex gap-2">
-                    <Checkbox
-                      checked={landingRunways.includes(runway)}
-                      onChange={() => toggleRunway(runway, 'landing')}
-                      label="ARR"
-                      checkedClass="bg-green-600 border-green-600"
-                    />
-                    <Checkbox
-                      checked={departingRunways.includes(runway)}
-                      onChange={() => toggleRunway(runway, 'departing')}
-                      label="DEP"
-                      checkedClass="bg-blue-600 border-blue-600"
-                    />
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <Checkbox
+                        checked={landingRunways.includes(runway)}
+                        onCheckedChange={() => toggleRunway(runway, 'landing')}
+                        className="data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-600"
+                      />
+                      <span className="text-gray-200 select-none">ARR</span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <Checkbox
+                        checked={departingRunways.includes(runway)}
+                        onCheckedChange={() =>
+                          toggleRunway(runway, 'departing')
+                        }
+                      />
+                      <span className="text-gray-200 select-none">DEP</span>
+                    </label>
                   </div>
                 </div>
               ))}

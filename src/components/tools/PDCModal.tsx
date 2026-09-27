@@ -5,7 +5,7 @@ import type { Flight } from '../../types/flight';
 import type { AirportFrequencies } from '../../types/airports';
 import Button from '../common/Button';
 import TextInput from '../common/TextInput';
-import Checkbox from '../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface PDCModalProps {
   isOpen: boolean;
@@ -400,12 +400,17 @@ IDENTIFIER: ${identifier}`;
                 Frequencies
               </h3>
               <div className="flex gap-2">
-                <Checkbox
-                  checked={useCustomFreqs}
-                  onChange={setUseCustomFreqs}
-                  label="Use Custom Frequencies"
-                  className="text-sm"
-                />
+                <label className="flex cursor-pointer items-center gap-3 text-sm">
+                  <Checkbox
+                    checked={useCustomFreqs}
+                    onCheckedChange={(checked) =>
+                      setUseCustomFreqs(checked === true)
+                    }
+                  />
+                  <span className="text-gray-200 select-none">
+                    Use Custom Frequencies
+                  </span>
+                </label>
               </div>
             </div>
 

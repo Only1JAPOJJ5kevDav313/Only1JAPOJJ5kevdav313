@@ -1,29 +1,30 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
-import { AlertCircle, Info, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { AlertTriangle, FolderOpen, Info, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../hooks/auth/useAuth';
-import { useSettings } from '../hooks/settings/useSettings';
 import { createSession, fetchMySessions } from '../utils/fetch/sessions';
 import { generateATIS } from '../utils/fetch/atis';
 import { updateTutorialStatus } from '../utils/fetch/auth';
 import { steps } from '../components/tutorial/TutorialStepsCreate';
 import { useData } from '../hooks/data/useData';
-import { fetchBackgrounds } from '../utils/fetch/data';
 import Joyride, {
   type CallBackProps,
   STATUS,
 } from 'react-joyride-react19-compat';
 import { trackTutorialEvent } from '../utils/tutorialTracking';
 import Navbar from '../components/Navbar';
-import AirportDropdown from '../components/dropdowns/AirportDropdown';
-import RunwayDropdown from '../components/dropdowns/RunwayDropdown';
-import Checkbox from '../components/common/Checkbox';
-import Button from '../components/common/Button';
+import PageHero from '../components/common/PageHero';
+import AirportCombobox from '../components/dropdowns/AirportCombobox';
+import RunwaySelect from '../components/dropdowns/RunwaySelect';
 import WindDisplay from '../components/tools/WindDisplay';
 import AtisReminderModal from '../components/modals/AtisReminderModal';
 import CustomTooltip from '../components/tutorial/CustomTooltip';
-
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { minDuration } from '@/lib/minDuration';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 type NetworkSessionKind = 'standard' | 'pfatc' | 'advanced_atc';
 
@@ -45,12 +46,6 @@ function initialNetworkKind(
   return networkKindFromModeParam(searchParams.get('mode')) ?? 'standard';
 }
 
-interface AvailableImage {
-  filename: string;
-  path: string;
-  extension: string;
-}
-
 export default function Create() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -63,11 +58,10 @@ export default function Create() {
     initialNetworkKind(searchParams, startTutorial)
   );
   const [isCreating, setIsCreating] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
-  const [sessionCount, setSessionCount] = useState<number>(0);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [sessionLimitReached, setSessionLimitReached] =
     useState<boolean>(false);
-  const [isDeletingOldest, setIsDeletingOldest] = useState<boolean>(false);
   const [showAtisReminderModal, setShowAtisReminderModal] = useState(false);
   const [createdSession, setCreatedSession] = useState<{
     sessionId: string;
@@ -75,105 +69,21 @@ export default function Create() {
     atisText: string;
     networkSessionKind: 'pfatc' | 'advanced_atc';
   } | null>(null);
-  const [availableImages, setAvailableImages] = useState<AvailableImage[]>([]);
-  const [customLoaded, setCustomLoaded] = useState(false);
   const { user } = useAuth();
-  const { settings } = useSettings();
   const { airports, frequencies } = useData();
+  const maxSessions = user?.isAdmin || user?.isTester ? 100 : 50;
 
   useEffect(() => {
     if (user) {
       fetchMySessions()
         .then((sessions) => {
-          const maxSessions = user.isAdmin || user.isTester ? 100 : 50;
           setSessionCount(sessions.length);
           setSessionLimitReached(sessions.length >= maxSessions);
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setSessionsLoaded(true));
     }
-  }, [user]);
-
-  useEffect(() => {
-    const loadImages = async () => {
-      try {
-        const data = await fetchBackgrounds();
-        setAvailableImages(data);
-      } catch (error) {
-        console.error('Error loading available images:', error);
-      }
-    };
-    loadImages();
-  }, []);
-
-  const backgroundImage = useMemo(() => {
-    const selectedImage = settings?.backgroundImage?.selectedImage;
-    let bgImage = 'url("/assets/images/hero.webp")';
-
-    const getImageUrl = (filename: string | null): string | null => {
-      if (!filename || filename === 'random' || filename === 'favorites') {
-        return filename;
-      }
-      if (filename.startsWith('https://api.cephie.app/')) {
-        return filename;
-      }
-      return `${API_BASE_URL}/assets/app/backgrounds/${filename}`;
-    };
-
-    if (selectedImage === 'random') {
-      if (availableImages.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableImages.length);
-        bgImage = `url(${API_BASE_URL}${availableImages[randomIndex].path})`;
-      }
-    } else if (selectedImage === 'favorites') {
-      const favorites = settings?.backgroundImage?.favorites || [];
-      if (favorites.length > 0) {
-        const randomFav =
-          favorites[Math.floor(Math.random() * favorites.length)];
-        const favImageUrl = getImageUrl(randomFav);
-        if (
-          favImageUrl &&
-          favImageUrl !== 'random' &&
-          favImageUrl !== 'favorites'
-        ) {
-          bgImage = `url(${favImageUrl})`;
-        }
-      }
-    } else if (selectedImage) {
-      const imageUrl = getImageUrl(selectedImage);
-      if (imageUrl && imageUrl !== 'random' && imageUrl !== 'favorites') {
-        bgImage = `url(${imageUrl})`;
-      }
-    }
-
-    return bgImage;
-  }, [
-    settings?.backgroundImage?.selectedImage,
-    settings?.backgroundImage?.favorites,
-    availableImages,
-  ]);
-
-  useEffect(() => {
-    if (backgroundImage !== 'url("/assets/images/hero.webp")') {
-      setCustomLoaded(true);
-    }
-  }, [backgroundImage]);
-
-  const handleDeleteOldestSession = async () => {
-    setIsDeletingOldest(true);
-    setError('');
-
-    try {
-      setSessionCount((prev) => Math.max(0, prev - 1));
-      setSessionLimitReached(false);
-      setError('');
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to delete oldest session'
-      );
-    } finally {
-      setIsDeletingOldest(false);
-    }
-  };
+  }, [user, maxSessions]);
 
   const handleContinueToSession = (sessionId: string, accessId: string) => {
     const tutorialParam = startTutorial ? '&tutorial=true' : '';
@@ -181,37 +91,26 @@ export default function Create() {
   };
 
   const handleCreateSession = async () => {
-    if (!selectedAirport || !selectedRunway) {
-      setError('Please select both airport and departure runway');
-      return;
-    }
-
-    if (sessionLimitReached) {
-      const maxSessions = user?.isAdmin || user?.isTester ? 100 : 50;
-      setError(
-        `Session limit reached. You can create up to ${maxSessions} sessions.`
-      );
-      return;
-    }
+    if (!selectedAirport || !selectedRunway || sessionLimitReached) return;
 
     setIsCreating(true);
-    setError('');
+    void import('./Flights');
 
     try {
       const effectiveKind: NetworkSessionKind = startTutorial
         ? 'pfatc'
         : networkKind;
-      const newSession = await createSession({
-        airportIcao: selectedAirport,
-        activeRunway: selectedRunway,
-        arrivalRunway: selectedArrivalRunway || undefined,
-        isPFATC: effectiveKind === 'pfatc',
-        isAdvancedATC: false, // AATC disabled — was: effectiveKind === 'advanced_atc'
-        createdBy: user?.userId || 'unknown',
-        isTutorial: startTutorial,
-      });
-
-      setSessionCount((prev) => prev + 1);
+      const newSession = await minDuration(
+        createSession({
+          airportIcao: selectedAirport,
+          activeRunway: selectedRunway,
+          arrivalRunway: selectedArrivalRunway || undefined,
+          isPFATC: effectiveKind === 'pfatc',
+          isAdvancedATC: false, // AATC disabled — was: effectiveKind === 'advanced_atc'
+          createdBy: user?.userId || 'unknown',
+          isTutorial: startTutorial,
+        })
+      );
 
       let atisResponse = null;
       try {
@@ -252,7 +151,7 @@ export default function Create() {
       console.error('Error creating session:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to create session';
-      setError(errorMessage);
+      toast.error(errorMessage);
 
       if (
         errorMessage.includes('Session limit reached') ||
@@ -274,274 +173,169 @@ export default function Create() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white relative">
+    <div className="shadcn-scope min-h-screen bg-background text-foreground">
       <Navbar />
 
-      <div className="relative w-full h-80 md:h-96 overflow-hidden mb-4">
-        <div className="absolute inset-0">
-          <img
-            src="/assets/images/hero.webp"
-            alt="Banner"
-            className="object-cover w-full h-full scale-110"
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: customLoaded ? 1 : 0,
-              transition: 'opacity 0.5s ease-in-out',
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/70 to-zinc-950"></div>
+      <PageHero title="CREATE SESSION">
+        <div
+          id="session-count-info"
+          className="flex items-center gap-2 text-sm font-medium text-zinc-200 tabular-nums"
+        >
+          <FolderOpen className="size-4 text-blue-400" />
+          {sessionsLoaded ? (
+            `${sessionCount}/${maxSessions} sessions`
+          ) : (
+            <Skeleton className="h-4 w-24" />
+          )}
         </div>
+      </PageHero>
 
-        <div className="relative h-full flex flex-col items-center justify-center px-6 md:px-10">
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight text-center">
-            CREATE SESSION
-          </h1>
-        </div>
-      </div>
-
-      <div className="relative z-10 max-w-xl mx-auto px-4 -mt-24 md:-mt-32 pb-12">
-        <div className="bg-zinc-900/70 backdrop-blur-md border border-zinc-800 rounded-4xl p-6 space-y-6 shadow-2xl">
-          {error && (
-            <div className="p-3 bg-red-900/40 border border-red-700 rounded-full flex items-center text-sm">
-              <AlertCircle className="h-5 w-5 mr-2 text-red-400" />
-              {error}
+      <div className="relative z-10 mx-auto -mt-6 w-full max-w-[34rem] px-4 pb-16 md:-mt-8">
+        <form
+          className="flex flex-col gap-4 rounded-4xl border-2 border-zinc-800 bg-zinc-900 p-5 shadow-2xl"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreateSession();
+          }}
+        >
+          {sessionLimitReached && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-start gap-3 text-sm">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <p>
+                  <span className="font-medium text-amber-300">
+                    Session limit reached.
+                  </span>{' '}
+                  <span className="text-muted-foreground">
+                    Delete an old session to create a new one.
+                  </span>
+                </p>
+              </div>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white focus-visible:bg-amber-500 focus-visible:text-white focus-visible:ring-0 dark:hover:bg-amber-500"
+              >
+                <Link to="/sessions">Manage sessions</Link>
+              </Button>
             </div>
           )}
 
-          <div
-            id="session-count-info"
-            className={`p-3 backdrop-blur-sm border-2 rounded-full flex items-center justify-between text-sm ${
-              sessionLimitReached
-                ? 'bg-red-900/40 border-red-700'
-                : sessionCount >= (user?.isAdmin || user?.isTester ? 48 : 8)
-                  ? 'bg-yellow-900/40 border-yellow-700'
-                  : 'bg-blue-900/40 border-blue-500/50'
-            }`}
-          >
-            <div className="flex items-center">
-              <Info
-                className={`h-4 w-4 mr-2 ${
-                  sessionLimitReached
-                    ? 'text-red-400'
-                    : sessionCount >= (user?.isAdmin || user?.isTester ? 48 : 8)
-                      ? 'text-yellow-400'
-                      : 'text-blue-400'
-                }`}
-              />
-              <span>
-                Sessions: {sessionCount}/
-                {user?.isAdmin || user?.isTester ? 100 : 50}
-                {sessionLimitReached && ' (Limit reached)'}
-              </span>
-            </div>
-
-            {sessionLimitReached && (
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={handleDeleteOldestSession}
-                disabled={isDeletingOldest}
-                className="flex items-center space-x-1 text-xs"
-              >
-                <Trash2 className="h-3 w-3" />
-                <span>
-                  {isDeletingOldest ? 'Deleting...' : 'Delete Oldest'}
-                </span>
-              </Button>
-            )}
-          </div>
-
-          <div id="airport-dropdown" className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">
-              Select Airport <span className="text-red-400">*</span>
-            </label>
-            <AirportDropdown
+          <div id="airport-dropdown" className="grid gap-2">
+            <Label htmlFor="create-airport" className="text-zinc-300">
+              Select airport <span className="-ml-1 text-red-400">*</span>
+            </Label>
+            <AirportCombobox
+              id="create-airport"
               value={selectedAirport}
               onChange={(airport) => {
                 setSelectedAirport(airport);
                 setSelectedRunway('');
                 setSelectedArrivalRunway('');
-                setError('');
               }}
               disabled={isCreating}
-              searchable
             />
           </div>
 
-          <div id="runway-dropdown" className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">
-              Select Departure Runway <span className="text-red-400">*</span>
-            </label>
-            <RunwayDropdown
+          <div id="runway-dropdown" className="grid gap-2">
+            <Label htmlFor="create-departure" className="text-zinc-300">
+              Select departure runway{' '}
+              <span className="-ml-1 text-red-400">*</span>
+            </Label>
+            <RunwaySelect
+              id="create-departure"
               airportIcao={selectedAirport}
               value={selectedRunway}
-              onChange={(runway) => {
-                setSelectedRunway(runway);
-                setError('');
-              }}
-              disabled={isCreating || !selectedAirport}
+              onChange={setSelectedRunway}
+              disabled={isCreating}
             />
           </div>
 
-          <div id="arrival-runway-dropdown" className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">
-              Select Arrival Runway{' '}
-              <span className="text-zinc-500">(Optional)</span>
-            </label>
-            <RunwayDropdown
+          <div id="arrival-runway-dropdown" className="grid gap-2">
+            <Label htmlFor="create-arrival" className="text-zinc-300">
+              Select arrival runway
+              <span className="font-normal text-zinc-500">(optional)</span>
+            </Label>
+            <RunwaySelect
+              id="create-arrival"
               airportIcao={selectedAirport}
               value={selectedArrivalRunway}
-              onChange={(runway) => {
-                setSelectedArrivalRunway(runway);
-                setError('');
-              }}
-              disabled={isCreating || !selectedAirport}
+              onChange={setSelectedArrivalRunway}
+              disabled={isCreating}
               placeholder="Same as departure"
+              noneLabel="Same as departure"
             />
           </div>
 
-          {selectedAirport && <WindDisplay icao={selectedAirport} />}
+          {selectedAirport && (
+            <WindDisplay
+              icao={selectedAirport}
+              className="rounded-2xl border-zinc-800 bg-zinc-950"
+            />
+          )}
 
           <div
             id="network-session-options"
-            className="w-full border-t border-zinc-700 pt-6 space-y-4"
+            className="flex flex-col gap-2 pt-1"
           >
-            <div className="flex flex-row gap-4 w-full">
-              <p>I am controlling on the</p>
-              <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <span className="text-zinc-300">I am controlling on the</span>
+              <label
+                htmlFor="pfatc-checkbox"
+                className="flex cursor-pointer items-center gap-3 has-disabled:cursor-not-allowed"
+              >
                 <Checkbox
                   id="pfatc-checkbox"
-                  checked={startTutorial ? true : networkKind === 'pfatc'}
-                  onChange={(checked) => {
-                    setNetworkKind(checked ? 'pfatc' : 'standard');
-                  }}
-                  label={
-                    <a
-                      href="https://discord.gg/pfatc"
-                      className="underline text-blue-400 hover:text-blue-500"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      PFATC Network
-                    </a>
+                  checked={startTutorial || networkKind === 'pfatc'}
+                  onCheckedChange={(checked) =>
+                    setNetworkKind(checked === true ? 'pfatc' : 'standard')
                   }
-                  className="text-zinc-300 w-full"
-                  disabled={startTutorial ? true : false}
+                  disabled={startTutorial || isCreating}
                 />
-              </div>
-              {/* AATC Network checkbox disabled — AATC network not currently active
-              <div className="flex-1">
-                <Checkbox
-                  id="advanced-atc-checkbox"
-                  checked={
-                    startTutorial ? false : networkKind === 'advanced_atc'
-                  }
-                  onChange={(checked) => {
-                    setNetworkKind(checked ? 'advanced_atc' : 'standard');
-                  }}
-                  label={
-                    <a
-                      href="https://discord.gg/kP3GJYk7mz"
-                      className="underline text-blue-400 hover:text-blue-500"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      AATC Network
-                    </a>
-                  }
-                  className="text-zinc-300 w-full"
-                  disabled={startTutorial ? true : false}
-                />
-              </div>
-              */}
+                <a
+                  href="https://discord.gg/pfatc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-400 underline underline-offset-4 hover:text-blue-300"
+                >
+                  PFATC Network
+                </a>
+              </label>
             </div>
             {networkKind === 'pfatc' && !startTutorial && (
-              <div className="mt-2 p-3 bg-blue-900/40 backdrop-blur-sm border border-blue-500/50 rounded-2xl w-full">
-                <div className="flex items-start space-x-2">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <Info className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="text-blue-300">
-                      All submitted flights will be publicly viewable on the
-                      Network Overview page. Flights are shared between
-                      sessions, allowing controllers to see the arrivals and
-                      traffic of other open sessions.
-                    </p>
-                  </div>
-                </div>
+              <div className="flex animate-in items-start gap-2 text-sm text-zinc-400 fade-in-0 slide-in-from-top-1">
+                <Info className="mt-0.5 size-4 shrink-0 text-blue-400" />
+                <p>
+                  All submitted flights will be publicly viewable on the Network
+                  Overview page. Flights are shared between sessions, allowing
+                  controllers to see the arrivals and traffic of other open
+                  sessions.
+                </p>
               </div>
             )}
-            {/* AATC info box disabled — AATC network not currently active
-            {networkKind === 'advanced_atc' && !startTutorial && (
-              <div className="mt-2 p-3 bg-violet-900/40 backdrop-blur-sm border border-violet-500/50 rounded-2xl w-full">
-                <div className="flex items-start space-x-2">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <Info className="h-4 w-4 text-violet-400" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="text-violet-300">
-                      All submitted flights will be publicly viewable on the
-                      Network Overview page. Flights are shared between
-                      sessions, allowing controllers to see the arrivals and
-                      traffic of other open sessions.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            */}
           </div>
 
-          <div className="border-t border-zinc-700 pt-4">
-            <Button
-              id="create-session-btn"
-              onClick={handleCreateSession}
-              disabled={isCreating || sessionLimitReached}
-              className={`w-full ${
-                isCreating || sessionLimitReached
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
-              }`}
-            >
-              {isCreating ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Creating Session...
-                </span>
-              ) : sessionLimitReached ? (
-                'Session Limit Reached'
-              ) : (
-                'Create Session'
-              )}
-            </Button>
-          </div>
-        </div>
+          <Button
+            id="create-session-btn"
+            type="submit"
+            size="lg"
+            className="h-11 w-full rounded-xl"
+            disabled={
+              isCreating ||
+              sessionLimitReached ||
+              !selectedAirport ||
+              !selectedRunway
+            }
+          >
+            {isCreating && <Loader2 className="animate-spin" />}
+            {isCreating
+              ? 'Creating session…'
+              : sessionLimitReached
+                ? 'Session limit reached'
+                : 'Create session'}
+          </Button>
+        </form>
       </div>
 
       <Joyride

@@ -26,6 +26,7 @@ import Navbar from '../components/Navbar';
 import PageHero from '../components/common/PageHero';
 import SessionTypeLabel from '../components/common/SessionTypeLabel';
 import { Button } from '@/components/ui/button';
+import { minDuration } from '@/lib/minDuration';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -73,9 +74,9 @@ function FlightCardSkeleton() {
 }
 
 const ACTION_TONES = {
-  blue: 'border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white dark:hover:bg-blue-600',
+  blue: 'border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white focus-visible:bg-blue-600 focus-visible:text-white dark:hover:bg-blue-600',
   amber:
-    'border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-white focus-visible:bg-amber-500 focus-visible:text-white dark:hover:bg-amber-500',
+    'border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white focus-visible:bg-amber-500 focus-visible:text-white dark:hover:bg-amber-500',
 } as const;
 
 function CardAction({
@@ -159,7 +160,9 @@ function FlightCard({
     }
     setFeaturedLoading(true);
     try {
-      const result = await toggleFeaturedOnProfile(String(flight.id));
+      const result = await minDuration(
+        toggleFeaturedOnProfile(String(flight.id))
+      );
       setFeatured(result.featured);
       onFeaturedToggle(String(flight.id), result.featured);
     } catch {
@@ -172,7 +175,7 @@ function FlightCard({
   const handleConfirmDelete = async () => {
     setDeleting(true);
     try {
-      await deleteFlight(flight.session_id, flight.id);
+      await minDuration(deleteFlight(flight.session_id, flight.id));
       setDeleteConfirmOpen(false);
       onDelete(String(flight.id));
     } catch {
@@ -254,7 +257,11 @@ function FlightCard({
           aria-disabled={atCap || featuredLoading}
           onClick={handleToggleFeatured}
         >
-          <Star className={cn(featured && 'fill-current')} />
+          {featuredLoading ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            <Star className={cn(featured && 'fill-current')} />
+          )}
         </CardAction>
         {publicFlightUrl && (
           <CardAction label="Copy share link" onClick={handleShare}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { Star, MessageSquare, Flag } from 'lucide-react';
+import { Star, MessageSquare, Flag, Loader2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Button from '../components/common/Button';
 import ErrorScreen from '../components/common/ErrorScreen';
@@ -20,6 +20,7 @@ import {
   type MyRatingDistributionBucket,
 } from '../utils/fetch/ratings';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const MAX_REPORT_REASON_LENGTH = 500;
 
@@ -165,7 +166,7 @@ export default function MyFeedback() {
     if (!reportingId || !reportReason.trim()) return;
     setSubmittingReport(true);
     try {
-      await reportMyRating(reportingId, reportReason.trim());
+      await minDuration(reportMyRating(reportingId, reportReason.trim()));
       setRatings((prev) =>
         prev.map((r) => (r.id === reportingId ? { ...r, reported: true } : r))
       );
@@ -602,6 +603,9 @@ export default function MyFeedback() {
             variant="danger"
             disabled={submittingReport || !reportReason.trim()}
           >
+            {submittingReport && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             {submittingReport ? 'Reporting…' : 'Report'}
           </Button>
         }

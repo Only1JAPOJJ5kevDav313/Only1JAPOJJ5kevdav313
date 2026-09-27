@@ -230,29 +230,27 @@ export default function AdminSessions() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (
-      !(await confirm({
-        title: 'Delete this session?',
-        description:
-          'Are you sure you want to delete this session? This action cannot be undone.',
-        confirmText: 'Delete session',
-        destructive: true,
-      }))
-    ) {
-      return;
-    }
-
-    try {
-      await deleteAdminSession(sessionId);
-      toast.success('Session deleted successfully');
-      setShowModal(false);
-      setSelectedSession(null);
-      fetchSessions();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete session'
-      );
-    }
+    await confirm({
+      title: 'Delete this session?',
+      description:
+        'Are you sure you want to delete this session? This action cannot be undone.',
+      confirmText: 'Delete session',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteAdminSession(sessionId);
+          toast.success('Session deleted successfully');
+          setShowModal(false);
+          setSelectedSession(null);
+          fetchSessions();
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to delete session'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const mergeSession = (sessionId: string, patch: Partial<AdminSession>) => {
@@ -273,25 +271,24 @@ export default function AdminSessions() {
   };
 
   const handleReleaseClaim = async (session: AdminSession) => {
-    if (
-      !(await confirm({
-        title: 'Release external claim?',
-        description: `The developer app holding ${session.airport_icao} (${session.session_id}) will lose its claim. Pilots will get the built-in ACARS panel again unless the session is flagged external.`,
-        confirmText: 'Release claim',
-        destructive: true,
-      }))
-    ) {
-      return;
-    }
-    try {
-      await releaseAdminSessionClaim(session.session_id);
-      mergeSession(session.session_id, { external_claim: null });
-      toast.success('Claim released');
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to release claim'
-      );
-    }
+    await confirm({
+      title: 'Release external claim?',
+      description: `The developer app holding ${session.airport_icao} (${session.session_id}) will lose its claim. Pilots will get the built-in ACARS panel again unless the session is flagged external.`,
+      confirmText: 'Release claim',
+      destructive: true,
+      action: async () => {
+        try {
+          await releaseAdminSessionClaim(session.session_id);
+          mergeSession(session.session_id, { external_claim: null });
+          toast.success('Claim released');
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to release claim'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const formatTimeUntil = (dateString: string) => {

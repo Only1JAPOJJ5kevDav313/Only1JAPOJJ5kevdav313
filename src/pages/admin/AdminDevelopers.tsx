@@ -339,25 +339,25 @@ export default function AdminDevelopers() {
   };
 
   const handleSuspend = async (userId: string) => {
-    if (
-      !(await confirm({
-        title: 'Suspend this developer?',
-        description: 'Their API keys will stop working.',
-        confirmText: 'Suspend',
-        destructive: true,
-      }))
-    )
-      return;
-    setBusyId(userId);
-    try {
-      await suspendDeveloperProfile(userId);
-      toast.success('Developer suspended');
-      await load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Suspend failed');
-    } finally {
-      setBusyId(null);
-    }
+    await confirm({
+      title: 'Suspend this developer?',
+      description: 'Their API keys will stop working.',
+      confirmText: 'Suspend',
+      destructive: true,
+      action: async () => {
+        setBusyId(userId);
+        try {
+          await suspendDeveloperProfile(userId);
+          toast.success('Developer suspended');
+          await load();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Suspend failed');
+          throw e;
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   };
 
   const handleReactivate = async (userId: string) => {
@@ -374,27 +374,27 @@ export default function AdminDevelopers() {
   };
 
   const handleDeleteDeveloper = async (userId: string) => {
-    if (
-      !(await confirm({
-        title: 'Permanently delete this developer?',
-        description:
-          'This removes their developer profile, all API keys, application history, and developer API usage logs. The user account itself is not deleted.',
-        confirmText: 'Delete developer',
-        destructive: true,
-      }))
-    )
-      return;
-    setBusyId(userId);
-    try {
-      await deleteAdminDeveloperAccount(userId);
-      setEditUserId((cur) => (cur === userId ? null : cur));
-      toast.success('Developer deleted');
-      await load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Delete failed');
-    } finally {
-      setBusyId(null);
-    }
+    await confirm({
+      title: 'Permanently delete this developer?',
+      description:
+        'This removes their developer profile, all API keys, application history, and developer API usage logs. The user account itself is not deleted.',
+      confirmText: 'Delete developer',
+      destructive: true,
+      action: async () => {
+        setBusyId(userId);
+        try {
+          await deleteAdminDeveloperAccount(userId);
+          setEditUserId((cur) => (cur === userId ? null : cur));
+          toast.success('Developer deleted');
+          await load();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Delete failed');
+          throw e;
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   };
 
   const closeReject = () => {

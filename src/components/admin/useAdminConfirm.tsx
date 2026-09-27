@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
+import { minDuration } from '@/lib/minDuration';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,10 +18,12 @@ export type AdminConfirmOptions = {
   confirmText?: string;
   cancelText?: string;
   destructive?: boolean;
+  action?: () => Promise<unknown>;
 };
 
 export function useAdminConfirm() {
   const [options, setOptions] = useState<AdminConfirmOptions | null>(null);
+  const [pending, setPending] = useState(false);
   const resolver = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((opts: AdminConfirmOptions) => {
@@ -36,10 +40,28 @@ export function useAdminConfirm() {
     setOptions(null);
   };
 
+  const handleConfirm = async () => {
+    if (!options?.action) {
+      settle(true);
+      return;
+    }
+    setPending(true);
+    let ok = true;
+    try {
+      await minDuration(options.action());
+    } catch (error) {
+      console.error(error);
+      ok = false;
+    } finally {
+      setPending(false);
+    }
+    settle(ok);
+  };
+
   const confirmDialog = (
     <AlertDialog
       open={options !== null}
-      onOpenChange={(open) => !open && settle(false)}
+      onOpenChange={(open) => !open && !pending && settle(false)}
     >
       <AlertDialogContent variant={options?.destructive ? 'danger' : 'primary'}>
         <AlertDialogHeader>
@@ -49,13 +71,18 @@ export function useAdminConfirm() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
             {options?.cancelText ?? 'Cancel'}
           </AlertDialogCancel>
           <AlertDialogAction
             variant={options?.destructive ? 'destructive' : 'default'}
-            onClick={() => settle(true)}
+            disabled={pending}
+            onClick={(e) => {
+              e.preventDefault();
+              handleConfirm();
+            }}
           >
+            {pending && <Loader2 className="animate-spin" />}
             {options?.confirmText ?? 'Confirm'}
           </AlertDialogAction>
         </AlertDialogFooter>

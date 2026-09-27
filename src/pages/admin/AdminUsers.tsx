@@ -62,6 +62,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || '';
 
@@ -508,6 +509,7 @@ export default function AdminUsers() {
   const [selectedUserForRole, setSelectedUserForRole] =
     useState<AdminUser | null>(null);
   const [assigningRole, setAssigningRole] = useState(false);
+  const [removingRoles, setRemovingRoles] = useState(false);
 
   const filterOptions = [
     { value: 'all', label: 'All users' },
@@ -951,15 +953,28 @@ export default function AdminUsers() {
             <>
               <Button
                 variant="destructive"
-                onClick={() => {
-                  selectedUserForRole.roles?.forEach((role) =>
-                    handleRemoveRole(selectedUserForRole.id, role.id)
-                  );
+                onClick={async () => {
+                  setRemovingRoles(true);
+                  try {
+                    await minDuration(
+                      Promise.all(
+                        (selectedUserForRole.roles ?? []).map((role) =>
+                          handleRemoveRole(selectedUserForRole.id, role.id)
+                        )
+                      )
+                    );
+                  } finally {
+                    setRemovingRoles(false);
+                  }
                 }}
-                disabled={assigningRole || !selectedUserForRole.roles?.length}
+                disabled={
+                  assigningRole ||
+                  removingRoles ||
+                  !selectedUserForRole.roles?.length
+                }
                 className="sm:mr-auto"
               >
-                <X />
+                {removingRoles ? <Loader2 className="animate-spin" /> : <X />}
                 Remove all roles
               </Button>
               <Button variant="outline" onClick={() => setShowRoleModal(false)}>

@@ -113,6 +113,8 @@ export default function DeveloperKeys() {
   const [showRevoked, setShowRevoked] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedKeyIds, setExpandedKeyIds] = useState<Set<string>>(new Set());
+  const [busyKeyId, setBusyKeyId] = useState<string | null>(null);
+  const creatingKey = keyBusy && !busyKeyId;
 
   const toggleKeyExpand = (id: string) => {
     setExpandedKeyIds((prev) => {
@@ -128,34 +130,46 @@ export default function DeveloperKeys() {
   const visibleKeys = showRevoked ? keys : activeKeys;
   const showKeyList = visibleKeys.length > 0 || revokedKeys.length > 0;
 
+  const runKeyAction = async (
+    id: string,
+    fn: (id: string) => Promise<void>
+  ) => {
+    setBusyKeyId(id);
+    try {
+      await fn(id);
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
+
   const confirmRotate = async (id: string, name: string) => {
-    const ok = await confirm({
+    await confirm({
       title: 'Rotate API key?',
       description: `The current secret for "${name}" stops working immediately. Copy the new secret when it appears.`,
       confirmText: 'Rotate',
       destructive: true,
+      action: () => runKeyAction(id, handleRotateKey),
     });
-    if (ok) void handleRotateKey(id);
   };
 
   const confirmRevoke = async (id: string, name: string) => {
-    const ok = await confirm({
+    await confirm({
       title: 'Revoke API key?',
       description: `Clients using "${name}" will stop working immediately.`,
       confirmText: 'Revoke',
       destructive: true,
+      action: () => runKeyAction(id, handleRevoke),
     });
-    if (ok) void handleRevoke(id);
   };
 
   const confirmDelete = async (id: string, name: string) => {
-    const ok = await confirm({
+    await confirm({
       title: 'Delete revoked key?',
       description: `"${name}" will be permanently deleted. This cannot be undone.`,
       confirmText: 'Delete',
       destructive: true,
+      action: () => runKeyAction(id, handleDeleteKey),
     });
-    if (ok) void handleDeleteKey(id);
   };
 
   if (loading) {
@@ -339,12 +353,12 @@ export default function DeveloperKeys() {
                     void handleCreateKey().then(() => setCreateOpen(false))
                   }
                 >
-                  {keyBusy ? (
+                  {creatingKey ? (
                     <Loader2 className="animate-spin" />
                   ) : (
                     <KeyRound />
                   )}
-                  {keyBusy ? 'Creating…' : 'Generate key'}
+                  {creatingKey ? 'Creating…' : 'Generate key'}
                 </Button>
               </div>
             </SettingsGroup>
@@ -423,7 +437,7 @@ export default function DeveloperKeys() {
                       {!isRevoked && st === 'active' && (
                         <IconAction
                           label="Rotate key"
-                          disabled={keyBusy}
+                          disabled={busyKeyId === k.id}
                           onClick={() => void confirmRotate(k.id, k.name)}
                         >
                           <RefreshCw />
@@ -433,7 +447,7 @@ export default function DeveloperKeys() {
                         <IconAction
                           label="Revoke key"
                           destructive
-                          disabled={keyBusy}
+                          disabled={busyKeyId === k.id}
                           onClick={() => void confirmRevoke(k.id, k.name)}
                         >
                           <Ban />
@@ -443,7 +457,7 @@ export default function DeveloperKeys() {
                         <IconAction
                           label="Delete permanently"
                           destructive
-                          disabled={keyBusy}
+                          disabled={busyKeyId === k.id}
                           onClick={() => void confirmDelete(k.id, k.name)}
                         >
                           <Trash2 />

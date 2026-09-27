@@ -8,7 +8,7 @@ import SidDropdown from '../dropdowns/SidDropdown';
 import StarDropdown from '../dropdowns/StarDropdown';
 import AltitudeDropdown from '../dropdowns/AltitudeDropdown';
 import StatusDropdown from '../dropdowns/StatusDropdown';
-import Checkbox from '../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import RouteMap from '../map/LazyRouteMap';
 
 interface FlightDetailsModalProps {
@@ -223,25 +223,27 @@ export default function FlightDetailsModal({
                 Cleared
               </label>
               <div className="p-2 flex items-center justify-center">
-                <Checkbox
-                  checked={
-                    flight.clearance === 'true' || flight.clearance === true
-                  }
-                  onChange={(checked) =>
-                    onFlightChange?.(
-                      flight.id,
-                      'clearance',
-                      String(checked),
-                      String(flight.clearance || false)
-                    )
-                  }
-                  label={
-                    flight.clearance === 'true' || flight.clearance === true
+                <label className="flex cursor-pointer items-center gap-3">
+                  <Checkbox
+                    checked={
+                      flight.clearance === 'true' || flight.clearance === true
+                    }
+                    onCheckedChange={(checked) =>
+                      onFlightChange?.(
+                        flight.id,
+                        'clearance',
+                        String(checked === true),
+                        String(flight.clearance || false)
+                      )
+                    }
+                    className="data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-600"
+                  />
+                  <span className="text-gray-200 select-none">
+                    {flight.clearance === 'true' || flight.clearance === true
                       ? 'YES'
-                      : 'NO'
-                  }
-                  checkedClass="bg-green-600 border-green-600"
-                />
+                      : 'NO'}
+                  </span>
+                </label>
               </div>
             </div>
           </div>

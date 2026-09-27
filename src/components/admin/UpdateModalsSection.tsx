@@ -44,6 +44,7 @@ import {
   type UpdateModal,
 } from '../../utils/fetch/admin/updateModals';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 type UpdateModalsSectionProps = {
   className?: string;
@@ -89,6 +90,7 @@ export default function UpdateModalsSection({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingModal, setEditingModal] = useState<UpdateModal | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirm();
   const titleId = useId();
   const bannerId = useId();
@@ -123,8 +125,9 @@ export default function UpdateModalsSection({
       return;
     }
 
+    setSaving(true);
     try {
-      await createUpdateModal(formData);
+      await minDuration(createUpdateModal(formData));
       toast.success('Update modal created successfully');
       setShowAddModal(false);
       resetForm();
@@ -133,6 +136,8 @@ export default function UpdateModalsSection({
       toast.error(
         err instanceof Error ? err.message : 'Failed to create update modal'
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -143,8 +148,9 @@ export default function UpdateModalsSection({
       return;
     }
 
+    setSaving(true);
     try {
-      await updateUpdateModal(editingModal.id, formData);
+      await minDuration(updateUpdateModal(editingModal.id, formData));
       toast.success('Update modal updated successfully');
       setEditingModal(null);
       resetForm();
@@ -153,54 +159,56 @@ export default function UpdateModalsSection({
       toast.error(
         err instanceof Error ? err.message : 'Failed to update update modal'
       );
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (
-      !(await confirm({
-        title: 'Delete this update modal?',
-        description:
-          'The update modal will be permanently removed. This action cannot be undone.',
-        confirmText: 'Delete',
-        destructive: true,
-      }))
-    )
-      return;
-
-    try {
-      await deleteUpdateModal(id);
-      toast.success('Update modal deleted successfully');
-      fetchModals();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete update modal'
-      );
-    }
+    await confirm({
+      title: 'Delete this update modal?',
+      description:
+        'The update modal will be permanently removed. This action cannot be undone.',
+      confirmText: 'Delete',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteUpdateModal(id);
+          toast.success('Update modal deleted successfully');
+          fetchModals();
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to delete update modal'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const handlePublish = async (id: number) => {
-    if (
-      !(await confirm({
-        title: 'Publish this update modal?',
-        description:
-          "Publishing this modal will show it to users who haven't seen it yet (tracked via localStorage).",
-        confirmText: 'Publish',
-      }))
-    )
-      return;
-
-    try {
-      await publishUpdateModal(id);
-      toast.success(
-        'Update modal published! Users will see it on next page load.'
-      );
-      fetchModals();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to publish update modal'
-      );
-    }
+    await confirm({
+      title: 'Publish this update modal?',
+      description:
+        "Publishing this modal will show it to users who haven't seen it yet (tracked via localStorage).",
+      confirmText: 'Publish',
+      action: async () => {
+        try {
+          await publishUpdateModal(id);
+          toast.success(
+            'Update modal published! Users will see it on next page load.'
+          );
+          fetchModals();
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : 'Failed to publish update modal'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const handleUnpublish = async (id: number) => {
@@ -399,8 +407,9 @@ export default function UpdateModalsSection({
             </Button>
             <Button
               onClick={editingModal ? handleUpdate : handleCreate}
-              disabled={!formData.title || !formData.content}
+              disabled={saving || !formData.title || !formData.content}
             >
+              {saving && <Loader2 className="animate-spin" />}
               {editingModal ? 'Update' : 'Create'} Modal
             </Button>
           </>

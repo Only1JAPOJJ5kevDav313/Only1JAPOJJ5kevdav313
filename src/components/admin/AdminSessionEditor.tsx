@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RotateCcw, Save } from 'lucide-react';
+import { Loader2, RotateCcw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import AdminSelect from './AdminSelect';
@@ -12,6 +12,7 @@ import {
   type AdminSessionUpdate,
 } from '../../utils/fetch/admin';
 import type { Airport } from '../../types/airports';
+import { minDuration } from '@/lib/minDuration';
 
 type SessionType = NonNullable<AdminSessionUpdate['type']>;
 type ExternalMode = 'default' | 'on' | 'off';
@@ -153,7 +154,9 @@ export default function AdminSessionEditor({
     if (!canSave) return;
     try {
       setSaving(true);
-      const updated = await updateAdminSession(session.session_id, patch);
+      const updated = await minDuration(
+        updateAdminSession(session.session_id, patch)
+      );
       onSaved(updated);
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to update session');
@@ -251,7 +254,7 @@ export default function AdminSessionEditor({
           Reset
         </Button>
         <Button size="sm" onClick={handleSave} disabled={!canSave}>
-          <Save />
+          {saving ? <Loader2 className="animate-spin" /> : <Save />}
           {saving ? 'Saving…' : 'Save changes'}
         </Button>
       </div>

@@ -271,26 +271,26 @@ export default function AdminDeveloperManagePanel({
   };
 
   const submitRejectKey = async (k: AdminDeveloperKeyRow) => {
-    if (
-      !(await confirm({
-        title: 'Reject this key request?',
-        description: `The request for "${k.name}" will be rejected.`,
-        confirmText: 'Reject',
-        destructive: true,
-      }))
-    )
-      return;
-    setRowBusy(k.id);
-    try {
-      await rejectAdminDeveloperKey(developer.userId, k.id);
-      const kr = await fetchAdminDeveloperKeys(developer.userId);
-      setKeys(kr.keys);
-      await onReload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Reject failed');
-    } finally {
-      setRowBusy(null);
-    }
+    await confirm({
+      title: 'Reject this key request?',
+      description: `The request for "${k.name}" will be rejected.`,
+      confirmText: 'Reject',
+      destructive: true,
+      action: async () => {
+        setRowBusy(k.id);
+        try {
+          await rejectAdminDeveloperKey(developer.userId, k.id);
+          const kr = await fetchAdminDeveloperKeys(developer.userId);
+          setKeys(kr.keys);
+          await onReload();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Reject failed');
+          throw e;
+        } finally {
+          setRowBusy(null);
+        }
+      },
+    });
   };
 
   const openEdit = (k: AdminDeveloperKeyRow) => {
@@ -323,27 +323,27 @@ export default function AdminDeveloperManagePanel({
   };
 
   const doRevoke = async (k: AdminDeveloperKeyRow) => {
-    if (
-      !(await confirm({
-        title: `Revoke key “${k.name}”?`,
-        description:
-          'Requests using this key will fail immediately. This cannot be undone.',
-        confirmText: 'Revoke',
-        destructive: true,
-      }))
-    )
-      return;
-    setRowBusy(k.id);
-    try {
-      await revokeAdminDeveloperKey(developer.userId, k.id);
-      const kr = await fetchAdminDeveloperKeys(developer.userId);
-      setKeys(kr.keys);
-      await onReload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Revoke failed');
-    } finally {
-      setRowBusy(null);
-    }
+    await confirm({
+      title: `Revoke key “${k.name}”?`,
+      description:
+        'Requests using this key will fail immediately. This cannot be undone.',
+      confirmText: 'Revoke',
+      destructive: true,
+      action: async () => {
+        setRowBusy(k.id);
+        try {
+          await revokeAdminDeveloperKey(developer.userId, k.id);
+          const kr = await fetchAdminDeveloperKeys(developer.userId);
+          setKeys(kr.keys);
+          await onReload();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Revoke failed');
+          throw e;
+        } finally {
+          setRowBusy(null);
+        }
+      },
+    });
   };
 
   const toggleIn =

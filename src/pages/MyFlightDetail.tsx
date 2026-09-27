@@ -11,6 +11,7 @@ import {
   Camera,
   Check,
   ExternalLink,
+  Loader2,
   Plus,
   Share2,
   Star,
@@ -34,6 +35,7 @@ import { fetchBackgrounds } from '../utils/fetch/data';
 import { useData } from '../hooks/data/useData';
 import { parseCallsign } from '../utils/callsignParser';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
 
@@ -74,6 +76,7 @@ export default function MyFlightDetail() {
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [snaps, setSnaps] = useState<SnapImage[]>([]);
   const [snapUploading, setSnapUploading] = useState(false);
+  const [deletingSnapId, setDeletingSnapId] = useState<string | null>(null);
   const [snapError, setSnapError] = useState('');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const snapInputRef = useRef<HTMLInputElement>(null);
@@ -216,7 +219,9 @@ export default function MyFlightDetail() {
     if (!id || featuredLoading) return;
     setFeaturedLoading(true);
     try {
-      const { featured: newFeatured } = await toggleFeaturedOnProfile(id);
+      const { featured: newFeatured } = await minDuration(
+        toggleFeaturedOnProfile(id)
+      );
       setFeatured(newFeatured);
       toast.success(newFeatured ? 'Added to profile' : 'Removed from profile');
     } catch (err) {
@@ -236,7 +241,7 @@ export default function MyFlightDetail() {
     setSnapUploading(true);
     setSnapError('');
     try {
-      const result = await uploadSnapImage(id, file);
+      const result = await minDuration(uploadSnapImage(id, file));
       setSnaps(result.snap_images);
     } catch {
       setSnapError('Upload failed. Please try again.');
@@ -248,11 +253,14 @@ export default function MyFlightDetail() {
 
   const handleSnapDelete = async (cephieId: string) => {
     if (!id) return;
+    setDeletingSnapId(cephieId);
     try {
-      await deleteSnapImageApi(id, cephieId);
+      await minDuration(deleteSnapImageApi(id, cephieId));
       setSnaps((prev) => prev.filter((s) => s.cephie_id !== cephieId));
     } catch {
       setSnapError('Failed to delete photo.');
+    } finally {
+      setDeletingSnapId(null);
     }
   };
 
@@ -358,7 +366,13 @@ export default function MyFlightDetail() {
                 featured ? 'text-amber-400' : 'text-zinc-200 hover:bg-black/60'
               }`}
             >
-              <Star className={`h-4 w-4 ${featured ? 'fill-amber-400' : ''}`} />
+              {featuredLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Star
+                  className={`h-4 w-4 ${featured ? 'fill-amber-400' : ''}`}
+                />
+              )}
             </button>
             {acarsUrl && (
               <>
@@ -497,7 +511,11 @@ export default function MyFlightDetail() {
                   disabled={snapUploading || snaps.length >= 12}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-blue-500 bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  {snapUploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
                   {snapUploading ? 'Uploading…' : 'Add Photo'}
                 </button>
               </div>
@@ -536,9 +554,14 @@ export default function MyFlightDetail() {
                       />
                       <button
                         onClick={() => handleSnapDelete(snap.cephie_id)}
+                        disabled={deletingSnapId === snap.cephie_id}
                         className="absolute top-1.5 right-1.5 p-1 rounded-full bg-zinc-950/80 text-zinc-400 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        {deletingSnapId === snap.cephie_id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
                       </button>
                     </div>
                   ))}

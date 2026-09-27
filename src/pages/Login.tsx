@@ -5,7 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { TowerControl, Users } from 'lucide-react';
 import { FaDiscord } from 'react-icons/fa';
 import { useAuth } from '../hooks/auth/useAuth';
-import Checkbox from '../components/common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import Button from '../components/common/Button';
 
 export default function Login() {
@@ -112,45 +112,44 @@ export default function Login() {
                       ${agreed ? 'bg-blue-600/30 border-blue-600' : 'bg-blue-600/10 border-blue-800'}
                       hover:shadow-blue-700/20 focus-within:shadow-blue-700/30`}
           >
-            <Checkbox
-              checked={agreed}
-              onChange={setAgreed}
-              label={
-                <span className="text-sm">
-                  I agree to the{' '}
-                  <Link
-                    to="https://cephie.app/legal/terms"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-400 underline hover:text-blue-300 transition-colors"
-                    tabIndex={0}
-                  >
-                    Terms of Use
-                  </Link>
-                  ,{' '}
-                  <Link
-                    to="https://cephie.app/legal/privacy"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-400 underline hover:text-blue-300 transition-colors"
-                    tabIndex={0}
-                  >
-                    Privacy Policy
-                  </Link>
-                  , and{' '}
-                  <Link
-                    to="https://cephie.app/legal/cookies"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-400 underline hover:text-blue-300 transition-colors"
-                    tabIndex={0}
-                  >
-                    Cookies Policy
-                  </Link>
-                </span>
-              }
-              className="flex-1"
-            />
+            <label className="flex flex-1 cursor-pointer items-center gap-3">
+              <Checkbox
+                checked={agreed}
+                onCheckedChange={(checked) => setAgreed(checked === true)}
+              />
+              <span className="text-sm text-gray-200 select-none">
+                I agree to the{' '}
+                <Link
+                  to="https://cephie.app/legal/terms"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline hover:text-blue-300 transition-colors"
+                  tabIndex={0}
+                >
+                  Terms of Use
+                </Link>
+                ,{' '}
+                <Link
+                  to="https://cephie.app/legal/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline hover:text-blue-300 transition-colors"
+                  tabIndex={0}
+                >
+                  Privacy Policy
+                </Link>
+                , and{' '}
+                <Link
+                  to="https://cephie.app/legal/cookies"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline hover:text-blue-300 transition-colors"
+                  tabIndex={0}
+                >
+                  Cookies Policy
+                </Link>
+              </span>
+            </label>
           </div>
 
           <div className="flex w-full justify-center">

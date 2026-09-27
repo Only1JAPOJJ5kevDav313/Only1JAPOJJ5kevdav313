@@ -3,6 +3,7 @@ import {
   Check,
   Code,
   GripVertical,
+  Loader2,
   Pencil,
   Plus,
   ShieldCheck,
@@ -67,6 +68,7 @@ import {
   PRESET_COLORS,
 } from '../../utils/roles';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 type Permission = (typeof AVAILABLE_PERMISSIONS)[number];
 
@@ -228,6 +230,7 @@ export default function AdminRoles() {
   const [formIcon, setFormIcon] = useState('Star');
   const [formPriority, setFormPriority] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [assigningRoleId, setAssigningRoleId] = useState<number | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -312,14 +315,16 @@ export default function AdminRoles() {
     }
     try {
       setSubmitting(true);
-      await createRole({
-        name: formName.trim(),
-        description: formDescription.trim(),
-        permissions: formPermissions,
-        color: formColor,
-        icon: formIcon,
-        priority: isNaN(formPriority) ? 0 : formPriority,
-      });
+      await minDuration(
+        createRole({
+          name: formName.trim(),
+          description: formDescription.trim(),
+          permissions: formPermissions,
+          color: formColor,
+          icon: formIcon,
+          priority: isNaN(formPriority) ? 0 : formPriority,
+        })
+      );
       toast.success('Role created successfully');
       setShowCreateModal(false);
       resetForm();
@@ -342,14 +347,16 @@ export default function AdminRoles() {
     }
     try {
       setSubmitting(true);
-      await updateRole(selectedRole.id, {
-        name: formName.trim(),
-        description: formDescription.trim(),
-        permissions: formPermissions,
-        color: formColor,
-        icon: formIcon,
-        priority: isNaN(formPriority) ? 0 : formPriority,
-      });
+      await minDuration(
+        updateRole(selectedRole.id, {
+          name: formName.trim(),
+          description: formDescription.trim(),
+          permissions: formPermissions,
+          color: formColor,
+          icon: formIcon,
+          priority: isNaN(formPriority) ? 0 : formPriority,
+        })
+      );
       toast.success('Role updated successfully');
       setShowEditModal(false);
       resetForm();
@@ -366,31 +373,36 @@ export default function AdminRoles() {
       toast.error('Invalid role ID');
       return;
     }
-    const ok = await confirm({
+    await confirm({
       title: `Delete "${role.name}"?`,
       description: 'This removes the role from all assigned users.',
       confirmText: 'Delete role',
       destructive: true,
+      action: async () => {
+        try {
+          await deleteRole(role.id);
+          toast.success('Role deleted successfully');
+          await fetchData();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Failed to delete role');
+          throw e;
+        }
+      },
     });
-    if (!ok) return;
-    try {
-      await deleteRole(role.id);
-      toast.success('Role deleted successfully');
-      await fetchData();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to delete role');
-    }
   };
 
   const handleAssignRole = async (userId: string, roleId: number) => {
+    setAssigningRoleId(roleId);
     try {
-      await assignRoleToUser(userId, roleId);
+      await minDuration(assignRoleToUser(userId, roleId));
       toast.success('Role assigned successfully');
       setShowAddRoleModal(false);
       setSelectedUserForRole(null);
       await fetchData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to assign role');
+    } finally {
+      setAssigningRoleId(null);
     }
   };
 
@@ -917,6 +929,7 @@ export default function AdminRoles() {
               onClick={() => void handleCreateRole()}
               disabled={submitting}
             >
+              {submitting && <Loader2 className="animate-spin" />}
               {submitting ? 'Creating…' : 'Create role'}
             </Button>
           </>
@@ -936,6 +949,7 @@ export default function AdminRoles() {
               Cancel
             </Button>
             <Button onClick={() => void handleEditRole()} disabled={submitting}>
+              {submitting && <Loader2 className="animate-spin" />}
               {submitting ? 'Saving…' : 'Save changes'}
             </Button>
           </>
@@ -970,6 +984,7 @@ export default function AdminRoles() {
                   onClick={() =>
                     void handleAssignRole(selectedUserForRole!, role.id)
                   }
+                  disabled={assigningRoleId !== null}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none hover:bg-accent focus-visible:bg-accent"
                 >
                   <RoleIcon
@@ -979,7 +994,11 @@ export default function AdminRoles() {
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {role.name}
                   </span>
-                  <Plus className="size-4 shrink-0 text-muted-foreground" />
+                  {assigningRoleId === role.id ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Plus className="size-4 shrink-0 text-muted-foreground" />
+                  )}
                 </button>
               );
             })}

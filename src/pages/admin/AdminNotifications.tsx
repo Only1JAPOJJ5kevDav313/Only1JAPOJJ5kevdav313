@@ -4,6 +4,7 @@ import {
   Bell,
   CheckCircle2,
   Info,
+  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -50,6 +51,7 @@ import {
   type Notification,
 } from '../../utils/fetch/admin';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const TYPE_TONE: Record<string, AdminTone> = {
   info: 'info',
@@ -70,6 +72,7 @@ export default function AdminNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingNotification, setEditingNotification] =
     useState<Notification | null>(null);
   const { confirm, confirmDialog } = useAdminConfirm();
@@ -110,13 +113,16 @@ export default function AdminNotifications() {
   };
 
   const handleAddNotification = async () => {
+    setSaving(true);
     try {
-      await addNotification({
-        type: newNotification.type,
-        text: newNotification.text,
-        show: newNotification.show,
-        custom_color: newNotification.customColor?.trim() || null,
-      });
+      await minDuration(
+        addNotification({
+          type: newNotification.type,
+          text: newNotification.text,
+          show: newNotification.show,
+          custom_color: newNotification.customColor?.trim() || null,
+        })
+      );
       toast.success('Notification added successfully');
       setShowAddModal(false);
       setNewNotification({
@@ -128,6 +134,8 @@ export default function AdminNotifications() {
       fetchAllNotifications();
     } catch {
       toast.error('Failed to add notification');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -135,38 +143,41 @@ export default function AdminNotifications() {
     id: number,
     updates: Partial<Notification>
   ) => {
+    setSaving(true);
     try {
       const cleanedUpdates = {
         ...updates,
         custom_color: updates.custom_color?.trim() || null,
       };
-      await updateNotification(id, cleanedUpdates);
+      await minDuration(updateNotification(id, cleanedUpdates));
       toast.success('Notification updated successfully');
       setEditingNotification(null);
       fetchAllNotifications();
     } catch {
       toast.error('Failed to update notification');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDeleteNotification = async (id: number) => {
-    if (
-      !(await confirm({
-        title: 'Delete this notification?',
-        description:
-          'The notification will be removed from the site. This action cannot be undone.',
-        confirmText: 'Delete',
-        destructive: true,
-      }))
-    )
-      return;
-    try {
-      await deleteNotification(id);
-      toast.success('Notification deleted successfully');
-      fetchAllNotifications();
-    } catch {
-      toast.error('Failed to delete notification');
-    }
+    await confirm({
+      title: 'Delete this notification?',
+      description:
+        'The notification will be removed from the site. This action cannot be undone.',
+      confirmText: 'Delete',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteNotification(id);
+          toast.success('Notification deleted successfully');
+          fetchAllNotifications();
+        } catch (err) {
+          toast.error('Failed to delete notification');
+          throw err;
+        }
+      },
+    });
   };
 
   const closeModal = () => {
@@ -339,7 +350,9 @@ export default function AdminNotifications() {
                       )
                   : handleAddNotification
               }
+              disabled={saving}
             >
+              {saving && <Loader2 className="animate-spin" />}
               {editingNotification ? 'Update' : 'Add'}
             </Button>
           </>

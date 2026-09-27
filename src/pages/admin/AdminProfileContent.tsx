@@ -65,6 +65,7 @@ export default function AdminProfileContent() {
       await fn();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Action failed');
+      throw e;
     } finally {
       setBusyKeys((prev) => {
         const next = new Set(prev);
@@ -76,19 +77,17 @@ export default function AdminProfileContent() {
 
   const handleClearBio = useCallback(
     async (userId: string) => {
-      if (
-        !(await confirm({
-          title: "Clear this user's bio?",
-          description: 'This removes it from their public profile immediately.',
-          confirmText: 'Clear bio',
-          destructive: true,
-        }))
-      )
-        return;
-      void withBusy(`bio:${userId}`, async () => {
-        await adminClearUserBio(userId);
-        setUsers((prev) => prev.filter((u) => u.userId !== userId));
-        toast.success('Bio cleared');
+      await confirm({
+        title: "Clear this user's bio?",
+        description: 'This removes it from their public profile immediately.',
+        confirmText: 'Clear bio',
+        destructive: true,
+        action: () =>
+          withBusy(`bio:${userId}`, async () => {
+            await adminClearUserBio(userId);
+            setUsers((prev) => prev.filter((u) => u.userId !== userId));
+            toast.success('Bio cleared');
+          }),
       });
     },
     [confirm, withBusy]

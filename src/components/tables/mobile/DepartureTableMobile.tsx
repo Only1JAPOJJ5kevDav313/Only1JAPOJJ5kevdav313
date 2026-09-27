@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import type { Flight } from '../../../types/flight';
 import type { DepartureTableColumnSettings } from '../../../types/settings';
-import Checkbox from '../../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import TextInput from '../../common/TextInput';
 import AirportDropdown from '../../dropdowns/AirportDropdown';
 import RunwayDropdown from '../../dropdowns/RunwayDropdown';
@@ -718,12 +718,10 @@ export default function DepartureTableMobile({
                     <strong>Clearance:</strong>{' '}
                     <Checkbox
                       checked={isClearanceChecked(flight.clearance)}
-                      onChange={(checked) =>
-                        handleToggleClearance(flight.id, checked)
+                      onCheckedChange={(checked) =>
+                        handleToggleClearance(flight.id, checked === true)
                       }
-                      label=""
-                      checkedClass="bg-green-600 border-green-600"
-                      className="mt-3"
+                      className="mt-3 data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-600"
                     />
                   </div>
                 )}

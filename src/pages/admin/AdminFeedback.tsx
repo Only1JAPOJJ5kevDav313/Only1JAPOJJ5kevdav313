@@ -170,26 +170,25 @@ export default function AdminFeedback() {
   };
 
   const handleDeleteFeedback = async (id: number) => {
-    if (
-      !(await confirm({
-        title: 'Delete feedback?',
-        description:
-          'Are you sure you want to delete this feedback? This action cannot be undone.',
-        confirmText: 'Delete',
-        destructive: true,
-      }))
-    )
-      return;
-
-    try {
-      await deleteFeedback(id);
-      toast.success('Feedback deleted successfully');
-      fetchData();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete feedback'
-      );
-    }
+    await confirm({
+      title: 'Delete feedback?',
+      description:
+        'Are you sure you want to delete this feedback? This action cannot be undone.',
+      confirmText: 'Delete',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteFeedback(id);
+          toast.success('Feedback deleted successfully');
+          fetchData();
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to delete feedback'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const distribution = feedbackStats

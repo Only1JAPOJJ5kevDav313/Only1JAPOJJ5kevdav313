@@ -26,7 +26,7 @@ import {
 import { useAuth } from '../../hooks/auth/useAuth';
 import { fetchRoute } from '../../utils/fetch/data';
 import Dropdown from '../common/Dropdown';
-import Checkbox from '../common/Checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import StatusDropdown from '../dropdowns/StatusDropdown';
 import Button from '../common/Button';
 import WindDisplay from '../tools/WindDisplay';
@@ -1172,9 +1172,7 @@ export default function ProductShowcase() {
                           <td className="py-2 px-4 text-sm column-clearance">
                             <Checkbox
                               checked={cleared}
-                              onChange={() => {}}
-                              label=""
-                              checkedClass="bg-green-600 border-green-600"
+                              className="data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600 dark:data-[state=checked]:bg-green-600"
                             />
                           </td>
                           <td className="py-2 px-3 text-sm column-sts">

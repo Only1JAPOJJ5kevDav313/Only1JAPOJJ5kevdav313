@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Clock,
   Flag,
+  Loader2,
   Trash2,
 } from 'lucide-react';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
@@ -45,6 +46,7 @@ import {
   type ChatReport,
 } from '../../utils/fetch/admin';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const DEFAULT_AVATAR = '/assets/app/default/avatar.webp';
 
@@ -113,6 +115,7 @@ export default function AdminChatReports() {
   const [filterReporter, setFilterReporter] = useState<string>('all');
   const [selectedReport, setSelectedReport] = useState<ChatReport | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   const filterOptions = [
@@ -155,32 +158,35 @@ export default function AdminChatReports() {
   };
 
   const handleDismissReport = async (reportId: number) => {
-    if (
-      !(await confirm({
-        title: 'Dismiss this report?',
-        description:
-          'Are you sure you want to dismiss this report? It will be permanently removed.',
-        confirmText: 'Dismiss report',
-        destructive: true,
-      }))
-    )
-      return;
-    try {
-      await deleteChatReport(reportId);
-      toast.success('Report dismissed');
-      fetchReports();
-    } catch {
-      toast.error('Failed to dismiss report');
-    }
+    await confirm({
+      title: 'Dismiss this report?',
+      description:
+        'Are you sure you want to dismiss this report? It will be permanently removed.',
+      confirmText: 'Dismiss report',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteChatReport(reportId);
+          toast.success('Report dismissed');
+          fetchReports();
+        } catch (err) {
+          toast.error('Failed to dismiss report');
+          throw err;
+        }
+      },
+    });
   };
 
   const handleMarkResolved = async (reportId: number) => {
+    setResolvingId(reportId);
     try {
-      await updateChatReportStatus(reportId, 'resolved');
+      await minDuration(updateChatReportStatus(reportId, 'resolved'));
       toast.success('Report marked as resolved');
       fetchReports();
     } catch {
       toast.error('Failed to update report');
+    } finally {
+      setResolvingId(null);
     }
   };
 
@@ -461,8 +467,15 @@ export default function AdminChatReports() {
               <Button variant="outline" onClick={() => setShowModal(false)}>
                 Close
               </Button>
-              <Button onClick={() => handleMarkResolved(selectedReport.id)}>
-                <CheckCircle2 />
+              <Button
+                onClick={() => handleMarkResolved(selectedReport.id)}
+                disabled={resolvingId === selectedReport.id}
+              >
+                {resolvingId === selectedReport.id ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <CheckCircle2 />
+                )}
                 Mark Resolved
               </Button>
             </>

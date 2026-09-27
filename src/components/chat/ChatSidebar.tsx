@@ -22,7 +22,15 @@ import {
   type GlobalChatMessage,
   type ConnectedGlobalChatUser,
 } from '../../sockets/globalChatSocket';
-import { Flag, MessageCircle, Radio, Wifi, WifiOff, Phone } from 'lucide-react';
+import {
+  Flag,
+  Loader2,
+  MessageCircle,
+  Radio,
+  Wifi,
+  WifiOff,
+  Phone,
+} from 'lucide-react';
 import type { ChatMessage, ChatMention } from '../../types/chats';
 import type { SessionUser } from '../../types/session';
 import {
@@ -38,6 +46,7 @@ import { ChatMessageRow, type ChatListMessage } from './ChatMessageRow';
 import { ChatTextComposer } from './ChatTextComposer';
 import { PanelHeader, SidePanel } from '../common/SidePanel';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 const MAX_HEADER_AVATARS = 5;
 
@@ -86,6 +95,7 @@ export default function ChatSidebar({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [reportingMessageId, setReportingMessageId] = useState<number | null>(
     null
   );
@@ -873,16 +883,21 @@ export default function ChatSidebar({
   async function handleSubmitReport() {
     if (!reportingMessageId || !reportReason.trim()) return;
 
+    setSubmittingReport(true);
     try {
       if (reportingGlobalMessage) {
         // AATC disabled — was: if (activeTab === 'aatc') { await reportAATCChatMessage(...) } else { ... }
-        await reportGlobalChatMessage(reportingMessageId, reportReason.trim());
+        await minDuration(
+          reportGlobalChatMessage(reportingMessageId, reportReason.trim())
+        );
       } else {
-        await reportChatMessage(
-          sessionId,
-          accessId,
-          reportingMessageId,
-          reportReason.trim()
+        await minDuration(
+          reportChatMessage(
+            sessionId,
+            accessId,
+            reportingMessageId,
+            reportReason.trim()
+          )
         );
       }
       toast.success('Message reported successfully.');
@@ -892,6 +907,8 @@ export default function ChatSidebar({
       setReportingGlobalMessage(false);
     } catch {
       toast.error('Failed to report message.');
+    } finally {
+      setSubmittingReport(false);
     }
   }
 
@@ -1308,7 +1325,14 @@ export default function ChatSidebar({
         variant="danger"
         icon={<Flag />}
         footer={
-          <Button onClick={handleSubmitReport} variant="danger">
+          <Button
+            onClick={handleSubmitReport}
+            variant="danger"
+            disabled={submittingReport}
+          >
+            {submittingReport && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Report
           </Button>
         }

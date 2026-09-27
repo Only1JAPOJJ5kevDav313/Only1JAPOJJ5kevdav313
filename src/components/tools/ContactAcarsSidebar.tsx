@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Radio, Plane, MapPin, Search, Check } from 'lucide-react';
+import { Radio, Plane, MapPin, Search, Check, Loader2 } from 'lucide-react';
 import { fetchFrequencies } from '../../utils/fetch/data';
 import type { AirportFrequency } from '../../types/airports';
 import type { Flight } from '../../types/flight';
@@ -19,6 +19,7 @@ import {
   containsHateSpeech,
   containsProfanity,
 } from '../../utils/hateSpeechFilter';
+import { minDuration } from '@/lib/minDuration';
 
 interface ContactAcarsSidebarProps {
   open: boolean;
@@ -135,11 +136,15 @@ export default function ContactAcarsSidebar({
 
     setSending(true);
     try {
-      await onSendContact(
-        selectedFlight.id,
-        customMessage || getDefaultMessage(),
-        airportIcao,
-        selectedPosition
+      await minDuration(
+        Promise.resolve(
+          onSendContact(
+            selectedFlight.id,
+            customMessage || getDefaultMessage(),
+            airportIcao,
+            selectedPosition
+          )
+        )
       );
       setCustomMessage('');
       setSelectedFlight(null);
@@ -318,6 +323,7 @@ export default function ContactAcarsSidebar({
           Cancel
         </Button>
         <Button size="sm" onClick={handleSend} disabled={!canSendMessage()}>
+          {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {sending ? 'Sending...' : 'Send ACARS Message'}
         </Button>
       </PanelFooter>

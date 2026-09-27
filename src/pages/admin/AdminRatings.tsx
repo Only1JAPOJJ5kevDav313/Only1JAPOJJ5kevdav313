@@ -243,25 +243,25 @@ export default function AdminRatings() {
   }, [ratingsSearch, ratingsFilter, ratingsFlagFilter, ratingsHasCommentOnly]);
 
   const handleDeleteRating = async (id: number) => {
-    if (
-      !(await confirm({
-        title: 'Delete this rating?',
-        description:
-          'The rating and its comment will be permanently removed. This action cannot be undone.',
-        confirmText: 'Delete',
-        destructive: true,
-      }))
-    )
-      return;
-    try {
-      await deleteAdminControllerRating(id);
-      toast.success('Rating deleted successfully');
-      fetchRatingsList();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to delete rating'
-      );
-    }
+    await confirm({
+      title: 'Delete this rating?',
+      description:
+        'The rating and its comment will be permanently removed. This action cannot be undone.',
+      confirmText: 'Delete',
+      destructive: true,
+      action: async () => {
+        try {
+          await deleteAdminControllerRating(id);
+          toast.success('Rating deleted successfully');
+          fetchRatingsList();
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to delete rating'
+          );
+          throw err;
+        }
+      },
+    });
   };
 
   const handleDismissReport = async (id: number) => {

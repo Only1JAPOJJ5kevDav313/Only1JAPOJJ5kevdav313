@@ -3,6 +3,7 @@ import { useLocation } from 'react-router';
 import {
   Ban,
   Globe,
+  Loader2,
   MapPin,
   ShieldCheck,
   Trash2,
@@ -51,6 +52,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { minDuration } from '@/lib/minDuration';
 
 interface BanRecord {
   id: number;
@@ -172,13 +174,15 @@ export default function AdminBan() {
         throw new Error('User ID is required');
       if (banType === 'ip' && !ipInput)
         throw new Error('IP address is required');
-      await banUser({
-        userId: banType === 'user' ? userIdInput : undefined,
-        ip: banType === 'ip' ? ipInput : undefined,
-        username: username || '',
-        reason,
-        expiresAt,
-      });
+      await minDuration(
+        banUser({
+          userId: banType === 'user' ? userIdInput : undefined,
+          ip: banType === 'ip' ? ipInput : undefined,
+          username: username || '',
+          reason,
+          expiresAt,
+        })
+      );
       toast.success(
         `Successfully banned ${banType === 'user' ? 'user' : 'IP'}`
       );
@@ -228,10 +232,12 @@ export default function AdminBan() {
     }
     setAddExceptionLoading(true);
     try {
-      await addVpnException({
-        userId: exceptionUserIdInput,
-        notes: exceptionNotesInput,
-      });
+      await minDuration(
+        addVpnException({
+          userId: exceptionUserIdInput,
+          notes: exceptionNotesInput,
+        })
+      );
       toast.success('Exception added');
       setExceptionUserIdInput('');
       setExceptionNotesInput('');
@@ -352,7 +358,7 @@ export default function AdminBan() {
                 disabled={loading || !reason}
                 className="w-full sm:w-auto"
               >
-                <Ban />
+                {loading ? <Loader2 className="animate-spin" /> : <Ban />}
                 {loading ? 'Banning…' : 'Apply ban'}
               </Button>
             </div>
@@ -530,6 +536,9 @@ export default function AdminBan() {
                     disabled={addExceptionLoading || !exceptionUserIdInput}
                     className="w-full sm:w-auto"
                   >
+                    {addExceptionLoading && (
+                      <Loader2 className="animate-spin" />
+                    )}
                     {addExceptionLoading ? 'Adding…' : 'Add exception'}
                   </Button>
                 </div>

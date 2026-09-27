@@ -29,6 +29,7 @@ import {
   GripVertical,
   Eye,
   EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { SiRoblox } from 'react-icons/si';
 import { fetchPilotProfile } from '../utils/fetch/pilot';
@@ -61,6 +62,7 @@ import ColorPicker from '../components/common/ColorPicker';
 import Loader from '../components/common/Loader';
 import Navbar from '../components/Navbar';
 import AccessDenied from '../components/AccessDenied';
+import { minDuration } from '@/lib/minDuration';
 
 type Ranks = Record<string, number | string | null>;
 
@@ -540,15 +542,17 @@ export default function PilotProfile({
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      await updateUserSettings({
-        bio: draft.bio,
-        displayBioOnProfile: draft.displayBioOnProfile,
-        profileCustomization: draft.customization,
-        displayControllerRatingOnProfile:
-          draft.displayControllerRatingOnProfile,
-        displayLinkedAccountsOnProfile: draft.displayLinkedAccountsOnProfile,
-        displayBackgroundOnProfile: draft.displayBackgroundOnProfile,
-      });
+      await minDuration(
+        updateUserSettings({
+          bio: draft.bio,
+          displayBioOnProfile: draft.displayBioOnProfile,
+          profileCustomization: draft.customization,
+          displayControllerRatingOnProfile:
+            draft.displayControllerRatingOnProfile,
+          displayLinkedAccountsOnProfile: draft.displayLinkedAccountsOnProfile,
+          displayBackgroundOnProfile: draft.displayBackgroundOnProfile,
+        })
+      );
       await refreshUser();
       await fetchProfile();
       setColorEditor(null);
@@ -1337,6 +1341,9 @@ export default function PilotProfile({
                           className={accentColor ? 'accent-hover-brighten' : ''}
                           style={accentButtonStyle(accentColor)}
                         >
+                          {saving && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
                           {saving ? 'Saving…' : 'Save'}
                         </Button>
                       </>
