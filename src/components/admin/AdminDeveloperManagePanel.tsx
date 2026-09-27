@@ -36,7 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import {
   approveAdminDeveloperKey,
   fetchAdminDeveloperCatalog,
@@ -139,7 +139,6 @@ export default function AdminDeveloperManagePanel({
   onProfileReactivate,
   profileActionBusy,
 }: Props) {
-  const { showError } = useToast();
   const { confirm, confirmDialog } = useAdminConfirm();
   const [catalog, setCatalog] = useState<AdminScopeCatalogEntry[]>([]);
   const [keys, setKeys] = useState<AdminDeveloperKeyRow[]>([]);
@@ -214,7 +213,11 @@ export default function AdminDeveloperManagePanel({
     if (ceiling.size === 0) return;
     setCeilingBusy(true);
     try {
-      await patchAdminDeveloperProfileScopes(developer.userId, [...ceiling]);
+      await patchAdminDeveloperProfileScopes(
+        developer.userId,
+        [...ceiling],
+        developer.allKeysScopes
+      );
       await onReload();
     } finally {
       setCeilingBusy(false);
@@ -261,7 +264,7 @@ export default function AdminDeveloperManagePanel({
       setKeys(kr.keys);
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Approve failed');
+      toast.error(e instanceof Error ? e.message : 'Approve failed');
     } finally {
       setRowBusy(null);
     }
@@ -284,7 +287,7 @@ export default function AdminDeveloperManagePanel({
       setKeys(kr.keys);
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Reject failed');
+      toast.error(e instanceof Error ? e.message : 'Reject failed');
     } finally {
       setRowBusy(null);
     }
@@ -313,7 +316,7 @@ export default function AdminDeveloperManagePanel({
       setKeys(kr.keys);
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setRowBusy(null);
     }
@@ -337,7 +340,7 @@ export default function AdminDeveloperManagePanel({
       setKeys(kr.keys);
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Revoke failed');
+      toast.error(e instanceof Error ? e.message : 'Revoke failed');
     } finally {
       setRowBusy(null);
     }

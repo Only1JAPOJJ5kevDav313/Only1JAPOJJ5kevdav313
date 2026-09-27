@@ -70,6 +70,7 @@ import {
   type DailyRatingStats,
   type AdminControllerRating,
 } from '../../utils/fetch/admin';
+import { toast } from 'sonner';
 
 const RATING_FILTER_OPTIONS = [
   { value: 'all', label: 'All Ratings' },
@@ -182,10 +183,6 @@ export default function AdminRatings() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
 
   const [ratings, setRatings] = useState<AdminControllerRating[]>([]);
   const [ratingsLoading, setRatingsLoading] = useState(true);
@@ -223,7 +220,7 @@ export default function AdminRatings() {
       const message =
         err instanceof Error ? err.message : 'Failed to fetch ratings';
       setRatingsError(message);
-      setToast({ message, type: 'error' });
+      toast.error(message);
     } finally {
       setRatingsLoading(false);
     }
@@ -258,38 +255,35 @@ export default function AdminRatings() {
       return;
     try {
       await deleteAdminControllerRating(id);
-      setToast({ message: 'Rating deleted successfully', type: 'success' });
+      toast.success('Rating deleted successfully');
       fetchRatingsList();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to delete rating',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete rating'
+      );
     }
   };
 
   const handleDismissReport = async (id: number) => {
     try {
       await dismissControllerRatingReport(id);
-      setToast({ message: 'Report dismissed', type: 'success' });
+      toast.success('Report dismissed');
       setRatings((prev) =>
         prev.map((r) =>
           r.id === id ? { ...r, reported: false, report_reason: null } : r
         )
       );
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to dismiss report',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to dismiss report'
+      );
     }
   };
 
   const handleDismissAutomod = async (id: number) => {
     try {
       await dismissAutomodFlag(id);
-      setToast({ message: 'Automod flag dismissed', type: 'success' });
+      toast.success('Automod flag dismissed');
       setRatings((prev) =>
         prev.map((r) =>
           r.id === id
@@ -298,11 +292,9 @@ export default function AdminRatings() {
         )
       );
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to dismiss automod flag',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to dismiss automod flag'
+      );
     }
   };
 
@@ -754,7 +746,7 @@ export default function AdminRatings() {
   );
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Controller Ratings"
         icon={ThumbsUp}

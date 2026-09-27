@@ -67,6 +67,7 @@ import {
   type AdminDeveloperApplication,
   type AdminDeveloperSummary,
 } from '../../utils/fetch/adminDevelopers';
+import { toast } from 'sonner';
 
 type Section = 'applications' | 'developers';
 
@@ -183,10 +184,6 @@ export default function AdminDevelopers() {
     null
   );
   const [refreshIconBusy, setRefreshIconBusy] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const loadSeqRef = useRef(0);
   const refreshIconClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -227,7 +224,7 @@ export default function AdminDevelopers() {
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to load';
         setError(message);
-        setToast({ message, type: 'error' });
+        toast.error(message);
       } finally {
         if (showPageLoader) {
           setLoading(false);
@@ -316,7 +313,7 @@ export default function AdminDevelopers() {
     try {
       await approveDeveloperApplication(appId, body);
       setReviewApp(null);
-      setToast({ message: 'Application approved', type: 'success' });
+      toast.success('Application approved');
       await load();
     } catch (e) {
       throw e instanceof Error ? e : new Error('Approve failed');
@@ -332,13 +329,10 @@ export default function AdminDevelopers() {
       await rejectDeveloperApplication(rejectId, rejectNote);
       setRejectId(null);
       setRejectNote('');
-      setToast({ message: 'Application rejected', type: 'success' });
+      toast.success('Application rejected');
       await load();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Reject failed',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Reject failed');
     } finally {
       setBusyId(null);
     }
@@ -357,13 +351,10 @@ export default function AdminDevelopers() {
     setBusyId(userId);
     try {
       await suspendDeveloperProfile(userId);
-      setToast({ message: 'Developer suspended', type: 'success' });
+      toast.success('Developer suspended');
       await load();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Suspend failed',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Suspend failed');
     } finally {
       setBusyId(null);
     }
@@ -373,13 +364,10 @@ export default function AdminDevelopers() {
     setBusyId(userId);
     try {
       await reactivateDeveloperProfile(userId);
-      setToast({ message: 'Developer reactivated', type: 'success' });
+      toast.success('Developer reactivated');
       await load();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Reactivate failed',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Reactivate failed');
     } finally {
       setBusyId(null);
     }
@@ -400,13 +388,10 @@ export default function AdminDevelopers() {
     try {
       await deleteAdminDeveloperAccount(userId);
       setEditUserId((cur) => (cur === userId ? null : cur));
-      setToast({ message: 'Developer deleted', type: 'success' });
+      toast.success('Developer deleted');
       await load();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Delete failed',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Delete failed');
     } finally {
       setBusyId(null);
     }
@@ -427,7 +412,7 @@ export default function AdminDevelopers() {
     });
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Developers"
         icon={Code}

@@ -17,7 +17,7 @@ import {
 import { useAdminConfirm } from '../../components/admin/useAdminConfirm';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import {
   fetchAdminProfileContent,
   adminClearUserBio,
@@ -27,7 +27,6 @@ import {
 const REFRESH_ICON_MIN_SPIN_MS = 500;
 
 export default function AdminProfileContent() {
-  const { showToast, showError } = useToast();
   const { confirm, confirmDialog } = useAdminConfirm();
   const [users, setUsers] = useState<AdminProfileContentUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,23 +59,20 @@ export default function AdminProfileContent() {
     }
   }, []);
 
-  const withBusy = useCallback(
-    async (key: string, fn: () => Promise<void>) => {
-      setBusyKeys((prev) => new Set(prev).add(key));
-      try {
-        await fn();
-      } catch (e) {
-        showError(e instanceof Error ? e.message : 'Action failed');
-      } finally {
-        setBusyKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      }
-    },
-    [showError]
-  );
+  const withBusy = useCallback(async (key: string, fn: () => Promise<void>) => {
+    setBusyKeys((prev) => new Set(prev).add(key));
+    try {
+      await fn();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Action failed');
+    } finally {
+      setBusyKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, []);
 
   const handleClearBio = useCallback(
     async (userId: string) => {
@@ -92,10 +88,10 @@ export default function AdminProfileContent() {
       void withBusy(`bio:${userId}`, async () => {
         await adminClearUserBio(userId);
         setUsers((prev) => prev.filter((u) => u.userId !== userId));
-        showToast('Bio cleared', 'success');
+        toast.success('Bio cleared');
       });
     },
-    [confirm, withBusy, showToast]
+    [confirm, withBusy]
   );
 
   useEffect(() => {

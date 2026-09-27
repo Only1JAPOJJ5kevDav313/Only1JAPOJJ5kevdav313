@@ -66,6 +66,7 @@ import {
   AVAILABLE_PERMISSIONS,
   PRESET_COLORS,
 } from '../../utils/roles';
+import { toast } from 'sonner';
 
 type Permission = (typeof AVAILABLE_PERMISSIONS)[number];
 
@@ -230,10 +231,6 @@ export default function AdminRoles() {
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [draggedId, setDraggedId] = useState<number | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
   const [selectedUserForRole, setSelectedUserForRole] = useState<string | null>(
     null
@@ -292,7 +289,7 @@ export default function AdminRoles() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
-      setToast({ message: errorMessage, type: 'error' });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -310,7 +307,7 @@ export default function AdminRoles() {
 
   const handleCreateRole = async () => {
     if (!formName.trim()) {
-      setToast({ message: 'Role name is required', type: 'error' });
+      toast.error('Role name is required');
       return;
     }
     try {
@@ -323,15 +320,12 @@ export default function AdminRoles() {
         icon: formIcon,
         priority: isNaN(formPriority) ? 0 : formPriority,
       });
-      setToast({ message: 'Role created successfully', type: 'success' });
+      toast.success('Role created successfully');
       setShowCreateModal(false);
       resetForm();
       await fetchData();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Failed to create role',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Failed to create role');
     } finally {
       setSubmitting(false);
     }
@@ -339,11 +333,11 @@ export default function AdminRoles() {
 
   const handleEditRole = async () => {
     if (!selectedRole || !formName.trim()) {
-      setToast({ message: 'Role name is required', type: 'error' });
+      toast.error('Role name is required');
       return;
     }
     if (!selectedRole.id || isNaN(selectedRole.id)) {
-      setToast({ message: 'Invalid role ID', type: 'error' });
+      toast.error('Invalid role ID');
       return;
     }
     try {
@@ -356,15 +350,12 @@ export default function AdminRoles() {
         icon: formIcon,
         priority: isNaN(formPriority) ? 0 : formPriority,
       });
-      setToast({ message: 'Role updated successfully', type: 'success' });
+      toast.success('Role updated successfully');
       setShowEditModal(false);
       resetForm();
       await fetchData();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Failed to update role',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Failed to update role');
     } finally {
       setSubmitting(false);
     }
@@ -372,7 +363,7 @@ export default function AdminRoles() {
 
   const handleDeleteRole = async (role: Role) => {
     if (!role.id || isNaN(role.id)) {
-      setToast({ message: 'Invalid role ID', type: 'error' });
+      toast.error('Invalid role ID');
       return;
     }
     const ok = await confirm({
@@ -384,41 +375,32 @@ export default function AdminRoles() {
     if (!ok) return;
     try {
       await deleteRole(role.id);
-      setToast({ message: 'Role deleted successfully', type: 'success' });
+      toast.success('Role deleted successfully');
       await fetchData();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Failed to delete role',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Failed to delete role');
     }
   };
 
   const handleAssignRole = async (userId: string, roleId: number) => {
     try {
       await assignRoleToUser(userId, roleId);
-      setToast({ message: 'Role assigned successfully', type: 'success' });
+      toast.success('Role assigned successfully');
       setShowAddRoleModal(false);
       setSelectedUserForRole(null);
       await fetchData();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Failed to assign role',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Failed to assign role');
     }
   };
 
   const handleRemoveRole = async (userId: string, roleId: number) => {
     try {
       await removeRoleFromUser(userId, roleId);
-      setToast({ message: 'Role removed successfully', type: 'success' });
+      toast.success('Role removed successfully');
       await fetchData();
     } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : 'Failed to remove role',
-        type: 'error',
-      });
+      toast.error(e instanceof Error ? e.message : 'Failed to remove role');
     }
   };
 
@@ -467,19 +449,17 @@ export default function AdminRoles() {
         priority: roles.length - index,
       }));
     if (rolePriorities.length === 0) {
-      setToast({ message: 'No valid roles to update', type: 'error' });
+      toast.error('No valid roles to update');
       return;
     }
     try {
       await updateRolePriorities(rolePriorities);
-      setToast({ message: 'Role order saved', type: 'success' });
+      toast.success('Role order saved');
       await fetchData();
     } catch (e) {
-      setToast({
-        message:
-          e instanceof Error ? e.message : 'Failed to update role priorities',
-        type: 'error',
-      });
+      toast.error(
+        e instanceof Error ? e.message : 'Failed to update role priorities'
+      );
       await fetchData();
     }
   };
@@ -654,7 +634,7 @@ export default function AdminRoles() {
   }, [selectedUserForRole, users, validRoles]);
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Roles"
         icon={ShieldCheck}

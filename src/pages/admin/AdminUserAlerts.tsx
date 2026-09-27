@@ -39,7 +39,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import {
   fetchAdminUserAlerts,
   sendAdminUserAlert,
@@ -50,7 +50,6 @@ const REFRESH_ICON_MIN_SPIN_MS = 500;
 const PAGE_SIZE = 50;
 
 export default function AdminUserAlerts() {
-  const { showToast, showError } = useToast();
   const [alerts, setAlerts] = useState<AdminUserAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +123,7 @@ export default function AdminUserAlerts() {
   const handleSend = async () => {
     const target = recipient.trim();
     if (!target || !title.trim() || !message.trim()) {
-      showError('Username or user ID, title, and message are all required.');
+      toast.error('Username or user ID, title, and message are all required.');
       return;
     }
     setSending(true);
@@ -134,14 +133,14 @@ export default function AdminUserAlerts() {
           ? { userId: target, title: title.trim(), message: message.trim() }
           : { username: target, title: title.trim(), message: message.trim() }
       );
-      showToast(`Alert sent to ${target}`, 'success');
+      toast.success(`Alert sent to ${target}`);
       setRecipient('');
       setTitle('');
       setMessage('');
       setPage(1);
       await load({ page: 1 });
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Failed to send alert');
+      toast.error(e instanceof Error ? e.message : 'Failed to send alert');
     } finally {
       setSending(false);
     }

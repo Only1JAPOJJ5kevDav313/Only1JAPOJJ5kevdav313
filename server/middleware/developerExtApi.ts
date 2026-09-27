@@ -28,21 +28,6 @@ function extractApiSecret(req: Request): string | null {
   return null;
 }
 
-export function parseScopesFromKey(scopes: unknown): string[] {
-  if (Array.isArray(scopes))
-    return scopes.filter((s): s is string => typeof s === 'string');
-  if (typeof scopes === 'string') {
-    try {
-      const p = JSON.parse(scopes) as unknown;
-      if (Array.isArray(p))
-        return p.filter((s): s is string => typeof s === 'string');
-    } catch {
-      // ignore
-    }
-  }
-  return [];
-}
-
 export function developerExtUsageLifecycle(
   req: Request,
   res: Response,
@@ -117,11 +102,10 @@ export async function developerExtApiAuth(
     if (!row) {
       return res.status(401).json({ error: 'Invalid or missing API key' });
     }
-    const scopes = parseScopesFromKey(row.key.scopes);
     req.developerExt = {
       keyId: String(row.key.id),
       userId: row.key.user_id,
-      scopes,
+      scopes: row.effectiveScopes,
       matchedScopeId: null,
       matchedPath: '',
       keyPrefix: row.key.prefix,

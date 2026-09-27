@@ -50,6 +50,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface BanRecord {
   id: number;
@@ -94,10 +95,6 @@ export default function AdminBan() {
   const [ipLocations, setIpLocations] = useState<Record<string, IpLocation>>(
     {}
   );
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
 
   const [vpnGateEnabled, setVpnGateEnabled] = useState(false);
   const [vpnExceptions, setVpnExceptions] = useState<VpnException[]>([]);
@@ -148,10 +145,7 @@ export default function AdminBan() {
       void lookupIpLocations(activeBans);
     } catch (err) {
       setBansError('Failed to load bans');
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to load bans',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Failed to load bans');
     } finally {
       setBansLoading(false);
     }
@@ -185,10 +179,9 @@ export default function AdminBan() {
         reason,
         expiresAt,
       });
-      setToast({
-        message: `Successfully banned ${banType === 'user' ? 'user' : 'IP'}`,
-        type: 'success',
-      });
+      toast.success(
+        `Successfully banned ${banType === 'user' ? 'user' : 'IP'}`
+      );
       setUserIdInput('');
       setIpInput('');
       setReason('');
@@ -196,10 +189,7 @@ export default function AdminBan() {
       setDurationPreset(null);
       void fetchBans();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to ban',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Failed to ban');
     } finally {
       setLoading(false);
     }
@@ -208,13 +198,10 @@ export default function AdminBan() {
   const handleUnban = async (userIdOrIp: string) => {
     try {
       await unbanUser(userIdOrIp);
-      setToast({ message: 'Successfully unbanned', type: 'success' });
+      toast.success('Successfully unbanned');
       void fetchBans();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to unban',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Failed to unban');
     }
   };
 
@@ -224,16 +211,11 @@ export default function AdminBan() {
       const newValue = !vpnGateEnabled;
       await toggleVpnGate(newValue);
       setVpnGateEnabled(newValue);
-      setToast({
-        message: `VPN gate ${newValue ? 'enabled' : 'disabled'}`,
-        type: 'success',
-      });
+      toast.success(`VPN gate ${newValue ? 'enabled' : 'disabled'}`);
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to toggle VPN gate',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to toggle VPN gate'
+      );
     } finally {
       setVpnToggleLoading(false);
     }
@@ -241,7 +223,7 @@ export default function AdminBan() {
 
   const handleAddException = async () => {
     if (!exceptionUserIdInput) {
-      setToast({ message: 'User ID is required', type: 'error' });
+      toast.error('User ID is required');
       return;
     }
     setAddExceptionLoading(true);
@@ -250,15 +232,14 @@ export default function AdminBan() {
         userId: exceptionUserIdInput,
         notes: exceptionNotesInput,
       });
-      setToast({ message: 'Exception added', type: 'success' });
+      toast.success('Exception added');
       setExceptionUserIdInput('');
       setExceptionNotesInput('');
       void fetchVpnGateData();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to add exception',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to add exception'
+      );
     } finally {
       setAddExceptionLoading(false);
     }
@@ -267,14 +248,12 @@ export default function AdminBan() {
   const handleRemoveException = async (exceptionUserId: string) => {
     try {
       await removeVpnException(exceptionUserId);
-      setToast({ message: 'Exception removed', type: 'success' });
+      toast.success('Exception removed');
       void fetchVpnGateData();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to remove exception',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to remove exception'
+      );
     }
   };
 
@@ -292,7 +271,7 @@ export default function AdminBan() {
   };
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage title="Bans & access" icon={Ban}>
         <AdminSection title="Create ban">
           <div className="grid gap-4">

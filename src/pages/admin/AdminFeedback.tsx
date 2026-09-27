@@ -38,6 +38,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -81,10 +82,6 @@ export default function AdminFeedback() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   const filterOptions = [
@@ -109,11 +106,9 @@ export default function AdminFeedback() {
     try {
       setFeedbackStats(await fetchFeedbackStats());
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to fetch feedback stats',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch feedback stats'
+      );
     }
   }, []);
 
@@ -135,10 +130,7 @@ export default function AdminFeedback() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch feedback';
       setError(errorMessage);
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -191,17 +183,12 @@ export default function AdminFeedback() {
 
     try {
       await deleteFeedback(id);
-      setToast({
-        message: 'Feedback deleted successfully',
-        type: 'success',
-      });
+      toast.success('Feedback deleted successfully');
       fetchData();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to delete feedback',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete feedback'
+      );
     }
   };
 
@@ -217,7 +204,7 @@ export default function AdminFeedback() {
   const maxBucket = Math.max(1, ...distribution.map((d) => Number(d.value)));
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Feedback"
         icon={MessagesSquare}

@@ -5,7 +5,6 @@ import Navbar from '../components/Navbar';
 import Button from '../components/common/Button';
 import ErrorScreen from '../components/common/ErrorScreen';
 import Modal from '../components/common/Modal';
-import Toast from '../components/common/Toast';
 import { useSettings } from '../hooks/settings/useSettings';
 import { fetchBackgrounds } from '../utils/fetch/data';
 import { AdminAreaChart } from '../components/admin/AdminChart';
@@ -20,7 +19,7 @@ import {
   type MyDailyRatingStats,
   type MyRatingDistributionBucket,
 } from '../utils/fetch/ratings';
-import type { ToastType } from '../components/common/Toast';
+import { toast } from 'sonner';
 
 const MAX_REPORT_REASON_LENGTH = 500;
 
@@ -156,10 +155,6 @@ export default function MyFeedback() {
   const [reportingId, setReportingId] = useState<number | null>(null);
   const [reportReason, setReportReason] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: ToastType;
-  } | null>(null);
 
   const handleReportClick = (id: number) => {
     setReportingId(id);
@@ -174,15 +169,13 @@ export default function MyFeedback() {
       setRatings((prev) =>
         prev.map((r) => (r.id === reportingId ? { ...r, reported: true } : r))
       );
-      setToast({ message: 'Comment reported for review.', type: 'success' });
+      toast.success('Comment reported for review.');
       setReportingId(null);
       setReportReason('');
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to report comment',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to report comment'
+      );
     } finally {
       setSubmittingReport(false);
     }
@@ -623,14 +616,6 @@ export default function MyFeedback() {
           disabled={submittingReport}
         />
       </Modal>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 }

@@ -44,6 +44,7 @@ import {
   deleteChatReport,
   type ChatReport,
 } from '../../utils/fetch/admin';
+import { toast } from 'sonner';
 
 const DEFAULT_AVATAR = '/assets/app/default/avatar.webp';
 
@@ -112,10 +113,6 @@ export default function AdminChatReports() {
   const [filterReporter, setFilterReporter] = useState<string>('all');
   const [selectedReport, setSelectedReport] = useState<ChatReport | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   const filterOptions = [
@@ -146,7 +143,7 @@ export default function AdminChatReports() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch reports';
       setError(errorMessage);
-      setToast({ message: errorMessage, type: 'error' });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -170,20 +167,20 @@ export default function AdminChatReports() {
       return;
     try {
       await deleteChatReport(reportId);
-      setToast({ message: 'Report dismissed', type: 'success' });
+      toast.success('Report dismissed');
       fetchReports();
     } catch {
-      setToast({ message: 'Failed to dismiss report', type: 'error' });
+      toast.error('Failed to dismiss report');
     }
   };
 
   const handleMarkResolved = async (reportId: number) => {
     try {
       await updateChatReportStatus(reportId, 'resolved');
-      setToast({ message: 'Report marked as resolved', type: 'success' });
+      toast.success('Report marked as resolved');
       fetchReports();
     } catch {
-      setToast({ message: 'Failed to update report', type: 'error' });
+      toast.error('Failed to update report');
     }
   };
 
@@ -264,7 +261,7 @@ export default function AdminChatReports() {
   );
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Chat Reports"
         icon={Flag}

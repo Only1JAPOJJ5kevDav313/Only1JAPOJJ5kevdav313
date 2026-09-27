@@ -35,7 +35,7 @@ import { fetchPilotProfile } from '../utils/fetch/pilot';
 import { parseCallsign } from '../utils/callsignParser';
 import { getCurrentUser } from '../utils/fetch/auth';
 import { useAuth } from '../hooks/auth/useAuth';
-import { useToast } from '../hooks/useToast';
+import { toast } from 'sonner';
 import { fetchBackgrounds, fetchUserRanks } from '../utils/fetch/data';
 import { updateUserSettings } from '../utils/fetch/settings';
 import {
@@ -366,7 +366,6 @@ export default function PilotProfile({
   const params = useParams<{ username: string }>();
   const username = usernameOverride ?? params.username;
   const { user, refreshUser } = useAuth();
-  const { showError } = useToast();
   const [profile, setProfile] = useState<PilotProfile | null>(
     initialProfile ?? null
   );
@@ -556,7 +555,7 @@ export default function PilotProfile({
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to save profile:', error);
-      showError('Failed to save profile changes');
+      toast.error('Failed to save profile changes');
     } finally {
       setSaving(false);
     }

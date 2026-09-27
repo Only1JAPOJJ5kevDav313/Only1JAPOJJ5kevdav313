@@ -18,7 +18,6 @@ import AdminStatusBadge from './AdminStatusBadge';
 import AdminTable from './AdminTable';
 import { AdminLoading } from './AdminStates';
 import { useAdminConfirm } from './useAdminConfirm';
-import Toast from '../common/Toast';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,14 +43,9 @@ import {
   unpublishUpdateModal,
   type UpdateModal,
 } from '../../utils/fetch/admin/updateModals';
-
-type SectionToast = {
-  message: string;
-  type: 'success' | 'error' | 'info';
-};
+import { toast } from 'sonner';
 
 type UpdateModalsSectionProps = {
-  onToast?: (toast: SectionToast) => void;
   className?: string;
 };
 
@@ -88,25 +82,16 @@ function RowAction({
 }
 
 export default function UpdateModalsSection({
-  onToast,
   className,
 }: UpdateModalsSectionProps = {}) {
   const [modals, setModals] = useState<UpdateModal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingModal, setEditingModal] = useState<UpdateModal | null>(null);
-  const [toast, setToast] = useState<SectionToast | null>(null);
   const [uploading, setUploading] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirm();
   const titleId = useId();
   const bannerId = useId();
-
-  useEffect(() => {
-    if (toast && onToast) {
-      onToast(toast);
-      setToast(null);
-    }
-  }, [toast, onToast]);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -124,11 +109,9 @@ export default function UpdateModalsSection({
       const data = await fetchAllUpdateModals();
       setModals(data);
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to fetch update modals',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch update modals'
+      );
     } finally {
       setLoading(false);
     }
@@ -136,50 +119,40 @@ export default function UpdateModalsSection({
 
   const handleCreate = async () => {
     if (!formData.title || !formData.content) {
-      setToast({ message: 'Title and content are required', type: 'error' });
+      toast.error('Title and content are required');
       return;
     }
 
     try {
       await createUpdateModal(formData);
-      setToast({
-        message: 'Update modal created successfully',
-        type: 'success',
-      });
+      toast.success('Update modal created successfully');
       setShowAddModal(false);
       resetForm();
       fetchModals();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to create update modal',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to create update modal'
+      );
     }
   };
 
   const handleUpdate = async () => {
     if (!editingModal) return;
     if (!formData.title || !formData.content) {
-      setToast({ message: 'Title and content are required', type: 'error' });
+      toast.error('Title and content are required');
       return;
     }
 
     try {
       await updateUpdateModal(editingModal.id, formData);
-      setToast({
-        message: 'Update modal updated successfully',
-        type: 'success',
-      });
+      toast.success('Update modal updated successfully');
       setEditingModal(null);
       resetForm();
       fetchModals();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to update update modal',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update update modal'
+      );
     }
   };
 
@@ -197,17 +170,12 @@ export default function UpdateModalsSection({
 
     try {
       await deleteUpdateModal(id);
-      setToast({
-        message: 'Update modal deleted successfully',
-        type: 'success',
-      });
+      toast.success('Update modal deleted successfully');
       fetchModals();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to delete update modal',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete update modal'
+      );
     }
   };
 
@@ -224,36 +192,26 @@ export default function UpdateModalsSection({
 
     try {
       await publishUpdateModal(id);
-      setToast({
-        message: 'Update modal published! Users will see it on next page load.',
-        type: 'success',
-      });
+      toast.success(
+        'Update modal published! Users will see it on next page load.'
+      );
       fetchModals();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to publish update modal',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to publish update modal'
+      );
     }
   };
 
   const handleUnpublish = async (id: number) => {
     try {
       await unpublishUpdateModal(id);
-      setToast({
-        message: 'Update modal unpublished successfully',
-        type: 'success',
-      });
+      toast.success('Update modal unpublished successfully');
       fetchModals();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Failed to unpublish update modal',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to unpublish update modal'
+      );
     }
   };
 
@@ -262,7 +220,7 @@ export default function UpdateModalsSection({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setToast({ message: 'Please upload an image file', type: 'error' });
+      toast.error('Please upload an image file');
       return;
     }
 
@@ -285,12 +243,11 @@ export default function UpdateModalsSection({
 
       const result = await response.json();
       setFormData((prev) => ({ ...prev, banner_url: result.url }));
-      setToast({ message: 'Banner uploaded successfully', type: 'success' });
+      toast.success('Banner uploaded successfully');
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to upload banner',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to upload banner'
+      );
     } finally {
       setUploading(false);
     }
@@ -523,14 +480,6 @@ export default function UpdateModalsSection({
       </AdminModal>
 
       {confirmDialog}
-
-      {!onToast && toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </>
   );
 }

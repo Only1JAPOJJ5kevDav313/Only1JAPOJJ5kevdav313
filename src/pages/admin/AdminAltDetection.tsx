@@ -60,6 +60,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const MEMBER_DISPLAY_CAP = 50;
 
@@ -491,10 +492,6 @@ export default function AdminAltDetection() {
   const [stats, setStats] = useState<AltClustersResponse['stats'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
 
   const [minScoreFilter, setMinScoreFilter] = useState<
     'all' | 'medium' | 'high' | 'critical'
@@ -540,11 +537,9 @@ export default function AdminAltDetection() {
       const hashToIp = new Map(history.map((h) => [h.hash, h.ip_address]));
       setRevealedHistories((prev) => new Map(prev).set(userId, hashToIp));
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to reveal IP history',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to reveal IP history'
+      );
     } finally {
       setRevealingHistoryId(null);
     }
@@ -616,7 +611,7 @@ export default function AdminAltDetection() {
   };
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Alt Detection"
         icon={GitMerge}

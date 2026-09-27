@@ -1,6 +1,5 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import Toast from '../common/Toast';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,19 +22,12 @@ export type DashboardCrumb = {
   mobileHidden?: boolean;
 };
 
-export type DashboardToast = {
-  message: string;
-  type: 'success' | 'error' | 'info';
-} | null;
-
 type DashboardShellProps = {
   sidebar: ReactNode;
   crumbs: DashboardCrumb[];
   storageKey: string;
   headerActions?: ReactNode;
   children: ReactNode;
-  toast?: DashboardToast;
-  onToastClose?: () => void;
 };
 
 function readSidebarOpen(storageKey: string): boolean {
@@ -52,8 +44,6 @@ export default function DashboardShell({
   storageKey,
   headerActions,
   children,
-  toast,
-  onToastClose,
 }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     readSidebarOpen(storageKey)
@@ -131,14 +121,6 @@ export default function DashboardShell({
             {children}
           </main>
         </SidebarInset>
-
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={onToastClose ?? (() => {})}
-          />
-        )}
       </SidebarProvider>
     </TooltipProvider>
   );

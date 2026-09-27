@@ -53,6 +53,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const TESTER_GATE_CHANNELS: { channel: TesterGateChannel; label: string }[] = [
   { channel: 'production', label: 'Production' },
@@ -94,11 +95,6 @@ export default function AdminTesters() {
   const [updatingChannel, setUpdatingChannel] =
     useState<TesterGateChannel | null>(null);
 
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
-
   const fetchTestersData = async () => {
     try {
       setLoading(true);
@@ -126,7 +122,7 @@ export default function AdminTesters() {
 
   const handleAddTester = async () => {
     if (!newTesterUserId.trim()) {
-      setToast({ message: 'User ID is required', type: 'error' });
+      toast.error('User ID is required');
       return;
     }
 
@@ -134,15 +130,12 @@ export default function AdminTesters() {
       setAddingTester(true);
       await addTester(newTesterUserId.trim(), newTesterNotes.trim());
 
-      setToast({ message: 'Tester added successfully', type: 'success' });
+      toast.success('Tester added successfully');
       setNewTesterUserId('');
       setNewTesterNotes('');
       fetchTestersData();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to add tester',
-        type: 'error',
-      });
+      toast.error(err instanceof Error ? err.message : 'Failed to add tester');
     } finally {
       setAddingTester(false);
     }
@@ -153,16 +146,12 @@ export default function AdminTesters() {
       setRemovingTester(userId);
       await removeTester(userId);
 
-      setToast({
-        message: 'Tester removed successfully',
-        type: 'success',
-      });
+      toast.success('Tester removed successfully');
       fetchTestersData();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to remove tester',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to remove tester'
+      );
     } finally {
       setRemovingTester(null);
     }
@@ -180,16 +169,13 @@ export default function AdminTesters() {
         [channel]: { tester_gate_enabled: nextEnabled },
       }));
 
-      setToast({
-        message: `Tester gate ${nextEnabled ? 'enabled' : 'disabled'} on ${channel}`,
-        type: 'success',
-      });
+      toast.success(
+        `Tester gate ${nextEnabled ? 'enabled' : 'disabled'} on ${channel}`
+      );
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to update settings',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to update settings'
+      );
     } finally {
       setUpdatingChannel(null);
     }
@@ -222,7 +208,7 @@ export default function AdminTesters() {
   };
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Testers"
         icon={FlaskConical}

@@ -4,24 +4,17 @@ import AdminSidebar from './AdminSidebar';
 import { findAdminNavItem } from './adminNav';
 import DashboardShell, {
   type DashboardCrumb,
-  type DashboardToast,
 } from '../dashboard/DashboardShell';
-
-export type AdminToast = DashboardToast;
 
 export type AdminBreadcrumb = { label: string; to?: string };
 
 type AdminLayoutProps = {
   children: ReactNode;
-  toast?: AdminToast;
-  onToastClose?: () => void;
   breadcrumbs?: AdminBreadcrumb[];
 };
 
 export default function AdminLayout({
   children,
-  toast,
-  onToastClose,
   breadcrumbs = [],
 }: AdminLayoutProps) {
   const location = useLocation();
@@ -41,8 +34,6 @@ export default function AdminLayout({
       sidebar={<AdminSidebar />}
       crumbs={crumbs}
       storageKey="admin-sidebar-collapsed"
-      toast={toast}
-      onToastClose={onToastClose}
     >
       {children}
     </DashboardShell>

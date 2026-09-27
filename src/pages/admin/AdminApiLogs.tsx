@@ -57,6 +57,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const methodOptions = [
   { value: '', label: 'All Methods' },
@@ -165,10 +166,6 @@ export default function AdminApiLogs() {
   const [dateToFilter, setDateToFilter] = useState('');
   const [selectedLog, setSelectedLog] = useState<ApiLog | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [clientPage, setClientPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
@@ -230,7 +227,7 @@ export default function AdminApiLogs() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch API logs';
       setError(errorMessage);
-      setToast({ message: errorMessage, type: 'error' });
+      toast.error(errorMessage);
     }
   };
 
@@ -240,11 +237,9 @@ export default function AdminApiLogs() {
       setStats(statsData);
     } catch (err) {
       console.error('Failed to fetch API log stats:', err);
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to fetch API log stats',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch API log stats'
+      );
     }
   };
 
@@ -254,10 +249,7 @@ export default function AdminApiLogs() {
       setSelectedLog(detailedLog);
       setShowDetails(true);
     } catch {
-      setToast({
-        message: 'Failed to fetch log details',
-        type: 'error',
-      });
+      toast.error('Failed to fetch log details');
     }
   };
 
@@ -303,7 +295,7 @@ export default function AdminApiLogs() {
   };
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage title="API Logs" icon={Activity}>
         {stats && (
           <AdminStatCards

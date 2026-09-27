@@ -49,6 +49,7 @@ import {
   deleteNotification,
   type Notification,
 } from '../../utils/fetch/admin';
+import { toast } from 'sonner';
 
 const TYPE_TONE: Record<string, AdminTone> = {
   info: 'info',
@@ -71,10 +72,6 @@ export default function AdminNotifications() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingNotification, setEditingNotification] =
     useState<Notification | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const { confirm, confirmDialog } = useAdminConfirm();
   const textId = useId();
   const colorId = useId();
@@ -120,10 +117,7 @@ export default function AdminNotifications() {
         show: newNotification.show,
         custom_color: newNotification.customColor?.trim() || null,
       });
-      setToast({
-        message: 'Notification added successfully',
-        type: 'success',
-      });
+      toast.success('Notification added successfully');
       setShowAddModal(false);
       setNewNotification({
         type: 'info',
@@ -133,7 +127,7 @@ export default function AdminNotifications() {
       });
       fetchAllNotifications();
     } catch {
-      setToast({ message: 'Failed to add notification', type: 'error' });
+      toast.error('Failed to add notification');
     }
   };
 
@@ -147,17 +141,11 @@ export default function AdminNotifications() {
         custom_color: updates.custom_color?.trim() || null,
       };
       await updateNotification(id, cleanedUpdates);
-      setToast({
-        message: 'Notification updated successfully',
-        type: 'success',
-      });
+      toast.success('Notification updated successfully');
       setEditingNotification(null);
       fetchAllNotifications();
     } catch {
-      setToast({
-        message: 'Failed to update notification',
-        type: 'error',
-      });
+      toast.error('Failed to update notification');
     }
   };
 
@@ -174,16 +162,10 @@ export default function AdminNotifications() {
       return;
     try {
       await deleteNotification(id);
-      setToast({
-        message: 'Notification deleted successfully',
-        type: 'success',
-      });
+      toast.success('Notification deleted successfully');
       fetchAllNotifications();
     } catch {
-      setToast({
-        message: 'Failed to delete notification',
-        type: 'error',
-      });
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -198,7 +180,7 @@ export default function AdminNotifications() {
     : newNotification.customColor;
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Notifications"
         icon={Bell}
@@ -332,7 +314,7 @@ export default function AdminNotifications() {
               </AdminTable>
             </AdminSection>
 
-            <UpdateModalsSection onToast={setToast} />
+            <UpdateModalsSection />
           </>
         )}
       </AdminPage>

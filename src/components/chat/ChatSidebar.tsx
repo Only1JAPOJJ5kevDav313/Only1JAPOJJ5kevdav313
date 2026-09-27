@@ -25,7 +25,6 @@ import {
 import { Flag, MessageCircle, Radio, Wifi, WifiOff, Phone } from 'lucide-react';
 import type { ChatMessage, ChatMention } from '../../types/chats';
 import type { SessionUser } from '../../types/session';
-import type { ToastType } from '../common/Toast';
 import {
   createVoiceChatSocket,
   type VoiceUser,
@@ -34,11 +33,11 @@ import {
 import Button from '../common/Button';
 import Loader from '../common/Loader';
 import Modal from '../common/Modal';
-import Toast from '../common/Toast';
 import VoiceChat from './VoiceChat';
 import { ChatMessageRow, type ChatListMessage } from './ChatMessageRow';
 import { ChatTextComposer } from './ChatTextComposer';
 import { PanelHeader, SidePanel } from '../common/SidePanel';
+import { toast } from 'sonner';
 
 const MAX_HEADER_AVATARS = 5;
 
@@ -91,10 +90,6 @@ export default function ChatSidebar({
     null
   );
   const [reportingGlobalMessage, setReportingGlobalMessage] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: ToastType;
-  } | null>(null);
   const [automoddedMessages, setAutomoddedMessages] = useState<
     Map<number, string>
   >(new Map());
@@ -890,13 +885,13 @@ export default function ChatSidebar({
           reportReason.trim()
         );
       }
-      setToast({ message: 'Message reported successfully.', type: 'success' });
+      toast.success('Message reported successfully.');
       setShowReportModal(false);
       setReportReason('');
       setReportingMessageId(null);
       setReportingGlobalMessage(false);
     } catch {
-      setToast({ message: 'Failed to report message.', type: 'error' });
+      toast.error('Failed to report message.');
     }
   }
 
@@ -1327,14 +1322,6 @@ export default function ChatSidebar({
           rows={4}
         />
       </Modal>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
 
       <style>{`
         .volume-slider::-webkit-slider-thumb {

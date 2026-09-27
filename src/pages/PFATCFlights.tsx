@@ -20,7 +20,7 @@ import {
 import { createPortal } from 'react-dom';
 import { createOverviewSocket } from '../sockets/overviewSocket';
 import { useAuth } from '../hooks/auth/useAuth';
-import { useToast } from '../hooks/useToast';
+import { toast } from 'sonner';
 import { useData } from '../hooks/data/useData';
 import { useSettings } from '../hooks/settings/useSettings';
 import { getChartsForAirport } from '../utils/acars';
@@ -65,7 +65,6 @@ interface FlightWithDetails extends Flight {
 
 export default function PFATCFlights() {
   const { user } = useAuth();
-  const { showError } = useToast();
   const { settings } = useSettings();
   const { airlines, loading: airlinesLoading } = useData();
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
@@ -451,7 +450,7 @@ export default function PFATCFlights() {
       },
       (error) => {
         console.error('Flight operation error:', error);
-        showError(error?.error || 'Flight operation failed');
+        toast.error(error?.error || 'Flight operation failed');
         if (error.flightId) {
           setPendingUpdates((prev) => {
             const next = new Map(prev);
@@ -482,7 +481,7 @@ export default function PFATCFlights() {
       socket.disconnect();
       overviewSocketRef.current = null;
     };
-  }, [isEventController, user?.userId, user?.username, showError]);
+  }, [isEventController, user?.userId, user?.username]);
 
   useEffect(() => {
     if (!isContactSidebarOpen) return;
@@ -531,7 +530,7 @@ export default function PFATCFlights() {
         },
         {
           onError: (error) =>
-            showError(error?.message || 'Sector controller error'),
+            toast.error(error?.message || 'Sector controller error'),
         }
       );
     }
@@ -548,7 +547,6 @@ export default function PFATCFlights() {
     user?.userId,
     user?.username,
     user?.avatar,
-    showError,
   ]);
 
   useEffect(() => {
@@ -833,7 +831,7 @@ export default function PFATCFlights() {
 
       if (!overviewSocketRef.current) {
         console.error('Overview socket not available');
-        showError('Live connection unavailable — changes were not saved');
+        toast.error('Live connection unavailable — changes were not saved');
         return;
       }
 
@@ -856,7 +854,7 @@ export default function PFATCFlights() {
         );
       } catch (error) {
         console.error('Failed to update flight:', error);
-        showError(
+        toast.error(
           error instanceof Error
             ? `Failed to update flight: ${error.message}`
             : 'Failed to update flight'
@@ -868,7 +866,7 @@ export default function PFATCFlights() {
         });
       }
     },
-    [allFlights, showError]
+    [allFlights]
   );
 
   const handleToggleHidden = (flight: Flight) => {

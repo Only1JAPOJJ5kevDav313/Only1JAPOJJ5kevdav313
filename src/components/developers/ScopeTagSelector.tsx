@@ -23,6 +23,8 @@ import {
   ScrollText,
   Trash2,
   Radar,
+  Lock,
+  Flag,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,6 +61,8 @@ const SCOPE_ICONS: Record<string, LucideIcon> = {
   'ratings.controller_stats': BarChart3,
   'notifications.read': Bell,
   'flight_logs.read': ScrollText,
+  'flights.network_manage': PencilLine,
+  'sessions.network_claim': Flag,
 };
 
 interface ScopeTagSelectorProps {
@@ -66,6 +70,8 @@ interface ScopeTagSelectorProps {
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
   readOnly?: boolean;
+  locked?: Set<string>;
+  lockedLabel?: string;
   className?: string;
   appearance?: 'dark' | 'light';
 }
@@ -80,6 +86,8 @@ export default function ScopeTagSelector({
   selected,
   onChange,
   readOnly = false,
+  locked,
+  lockedLabel = 'Locked',
   className = '',
 }: ScopeTagSelectorProps) {
   const groups = useMemo(() => {
@@ -94,7 +102,7 @@ export default function ScopeTagSelector({
   }, [catalog]);
 
   const toggle = (id: string) => {
-    if (readOnly) return;
+    if (readOnly || locked?.has(id)) return;
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -116,20 +124,25 @@ export default function ScopeTagSelector({
           </p>
           <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
             {entries.map((c) => {
-              const active = selected.has(c.id);
+              const isLocked = locked?.has(c.id) ?? false;
+              const active = isLocked || selected.has(c.id);
               const Icon = SCOPE_ICONS[c.id];
               return (
                 <button
                   key={c.id}
                   type="button"
-                  title={c.description}
+                  title={
+                    isLocked
+                      ? `${lockedLabel}: ${c.description}`
+                      : c.description
+                  }
                   onClick={() => toggle(c.id)}
-                  disabled={readOnly}
+                  disabled={readOnly || isLocked}
                   aria-pressed={active}
                   className={cn(
                     'flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     active ? 'text-foreground' : 'text-muted-foreground',
-                    readOnly
+                    readOnly || isLocked
                       ? 'cursor-default'
                       : 'cursor-pointer hover:bg-muted/60 hover:text-foreground'
                   )}
@@ -143,7 +156,11 @@ export default function ScopeTagSelector({
                     )}
                     aria-hidden
                   >
-                    {active ? <Check className="size-3.5" /> : null}
+                    {isLocked ? (
+                      <Lock className="size-3" />
+                    ) : active ? (
+                      <Check className="size-3.5" />
+                    ) : null}
                   </span>
                   {Icon ? (
                     <Icon
@@ -152,6 +169,11 @@ export default function ScopeTagSelector({
                     />
                   ) : null}
                   <span className="truncate">{c.label}</span>
+                  {isLocked ? (
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                      {lockedLabel}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

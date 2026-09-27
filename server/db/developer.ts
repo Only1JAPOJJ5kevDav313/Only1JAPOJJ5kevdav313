@@ -3,8 +3,28 @@ import { sql } from 'kysely';
 import { recordTableDeletes } from './databaseMetrics.js';
 
 function parseStringArray(value: unknown): string[] {
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
   if (!Array.isArray(value)) return [];
   return value.filter((x): x is string => typeof x === 'string');
+}
+
+export function effectiveKeyScopes(
+  keyScopes: unknown,
+  approvedScopes: unknown,
+  allKeysScopes: unknown
+): string[] {
+  const approved = new Set(parseStringArray(approvedScopes));
+  const merged = new Set([
+    ...parseStringArray(keyScopes),
+    ...parseStringArray(allKeysScopes),
+  ]);
+  return [...merged].filter((s) => approved.has(s));
 }
 
 export async function getDeveloperProfile(userId: string) {
@@ -142,19 +162,49 @@ export async function dismissDeveloperAdminNotice(userId: string) {
   `.execute(mainDb);
 }
 
-export async function updateDeveloperProfileApprovedScopes(
+export async function updateDeveloperProfilePermissions(
   userId: string,
-  approvedScopes: string[]
+  approvedScopes: string[],
+  allKeysScopes: string[]
 ) {
-  return mainDb
-    .updateTable('developer_profiles')
-    .set({
-      approved_scopes: sql`CAST(${JSON.stringify(approvedScopes)} AS jsonb)`,
-      updated_at: new Date(),
-    })
-    .where('user_id', '=', userId)
-    .returningAll()
-    .executeTakeFirst();
+  return mainDb.transaction().execute(async (trx) => {
+    const profile = await trx
+      .updateTable('developer_profiles')
+      .set({
+        approved_scopes: sql`CAST(${JSON.stringify(approvedScopes)} AS jsonb)`,
+        all_keys_scopes: sql`CAST(${JSON.stringify(allKeysScopes)} AS jsonb)`,
+        updated_at: new Date(),
+      })
+      .where('user_id', '=', userId)
+      .returningAll()
+      .executeTakeFirst();
+    if (!profile) return null;
+
+    const allowed = new Set(approvedScopes);
+    const keys = await trx
+      .selectFrom('developer_api_keys')
+      .select(['id', 'name', 'scopes'])
+      .where('user_id', '=', userId)
+      .where('revoked_at', 'is', null)
+      .execute();
+    const strippedKeys: { id: string; name: string; removed: string[] }[] = [];
+    for (const k of keys) {
+      const current = parseStringArray(k.scopes);
+      const kept = current.filter((s) => allowed.has(s));
+      if (kept.length === current.length) continue;
+      await trx
+        .updateTable('developer_api_keys')
+        .set({ scopes: sql`CAST(${JSON.stringify(kept)} AS jsonb)` })
+        .where('id', '=', k.id)
+        .execute();
+      strippedKeys.push({
+        id: String(k.id),
+        name: k.name,
+        removed: current.filter((s) => !allowed.has(s)),
+      });
+    }
+    return { profile, strippedKeys };
+  });
 }
 
 export async function setDeveloperProfileStatus(
@@ -451,6 +501,7 @@ export type DeveloperKeyRow = {
 export type DeveloperKeyWithProfile = {
   key: DeveloperKeyRow;
   profileApprovedScopes: string[];
+  effectiveScopes: string[];
   rateLimitPerMinute: number | null;
 };
 
@@ -471,13 +522,14 @@ export async function findActiveDeveloperKeyBySecretHash(
     .where('user_id', '=', key.user_id)
     .executeTakeFirst();
   if (!profile || profile.status !== 'active') return null;
-  const profileApprovedScopes = parseStringArray(profile.approved_scopes);
-  const keyScopes = parseStringArray(key.scopes);
-  const allowed = new Set(profileApprovedScopes);
-  if (!keyScopes.length || !keyScopes.every((s) => allowed.has(s))) return null;
   return {
     key: key as DeveloperKeyRow,
-    profileApprovedScopes,
+    profileApprovedScopes: parseStringArray(profile.approved_scopes),
+    effectiveScopes: effectiveKeyScopes(
+      key.scopes,
+      profile.approved_scopes,
+      profile.all_keys_scopes
+    ),
     rateLimitPerMinute: key.rate_limit_per_minute,
   };
 }
@@ -500,10 +552,11 @@ export async function isDeveloperKeyActiveWithScope(
     .where('user_id', '=', key.user_id)
     .executeTakeFirst();
   if (!profile || profile.status !== 'active') return false;
-  return (
-    parseStringArray(key.scopes).includes(scopeId) &&
-    parseStringArray(profile.approved_scopes).includes(scopeId)
-  );
+  return effectiveKeyScopes(
+    key.scopes,
+    profile.approved_scopes,
+    profile.all_keys_scopes
+  ).includes(scopeId);
 }
 
 export async function insertDeveloperApiUsage(input: {
@@ -600,6 +653,9 @@ export async function listApprovedDevelopersSummary() {
     userId: p.user_id,
     status: p.status,
     approvedScopes: parseStringArray(p.approved_scopes),
+    allKeysScopes: parseStringArray(p.all_keys_scopes).filter((s) =>
+      parseStringArray(p.approved_scopes).includes(s)
+    ),
     keysActive: keyCounts.get(p.user_id)?.usable ?? 0,
     keysPending: keyCounts.get(p.user_id)?.pending ?? 0,
     keysTotal: keyCounts.get(p.user_id)?.total ?? 0,

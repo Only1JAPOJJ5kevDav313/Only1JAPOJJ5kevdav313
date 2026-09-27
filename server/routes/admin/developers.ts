@@ -14,7 +14,7 @@ import {
   revokeDeveloperApiKey,
   updateApplicationReview,
   updateDeveloperApiKeyScopesAndRate,
-  updateDeveloperProfileApprovedScopes,
+  updateDeveloperProfilePermissions,
   upsertDeveloperProfile,
   setDeveloperProfileStatus,
   listApprovedDevelopersSummary,
@@ -69,6 +69,23 @@ function scopeListChange(prev: string[], next: string[]): string {
   }
   if (removed.length) return `Removed: ${labelScopes(removed)}.`;
   return `Added: ${labelScopes(added)}.`;
+}
+
+function allKeysChange(prev: string[], next: string[]): string {
+  const prevSet = new Set(prev);
+  const nextSet = new Set(next);
+  const added = next.filter((id) => !prevSet.has(id));
+  const removed = prev.filter((id) => !nextSet.has(id));
+  const bits: string[] = [];
+  if (added.length)
+    bits.push(`Now granted to all your keys: ${labelScopes(added)}.`);
+  if (removed.length)
+    bits.push(`No longer granted to all your keys: ${labelScopes(removed)}.`);
+  return bits.join(' ');
+}
+
+function isScopeIdList(raw: unknown): raw is string[] {
+  return Array.isArray(raw) && (raw.length === 0 || isValidScopeList(raw));
 }
 
 function formatRpm(rpm: number | null | undefined): string {
@@ -381,25 +398,46 @@ router.patch(
   async (req, res) => {
     try {
       const { userId } = req.params;
-      const { approvedScopes } = req.body ?? {};
+      const { approvedScopes, allKeysScopes = [] } = req.body ?? {};
       if (!isValidScopeList(approvedScopes)) {
         return res.status(400).json({
           error: 'approvedScopes must be a non-empty array of valid scope ids',
         });
       }
+      if (!isScopeIdList(allKeysScopes)) {
+        return res.status(400).json({
+          error: 'allKeysScopes must be an array of valid scope ids',
+        });
+      }
+      const allKeys = [...new Set(allKeysScopes)];
+      const approved = [...new Set([...approvedScopes, ...allKeys])];
       const prior = await getDeveloperProfile(userId);
-      const prevScopes = prior ? normalizeScopes(prior.approved_scopes) : [];
-      const row = await updateDeveloperProfileApprovedScopes(
+      const prevApproved = prior ? normalizeScopes(prior.approved_scopes) : [];
+      const prevAllKeys = prior ? normalizeScopes(prior.all_keys_scopes) : [];
+      const result = await updateDeveloperProfilePermissions(
         userId,
-        approvedScopes
+        approved,
+        allKeys
       );
-      if (!row)
+      if (!result)
         return res.status(404).json({ error: 'Developer profile not found' });
-      await notifyDeveloperInAppAndEmail(
-        userId,
-        `An administrator updated your allowed API scopes. ${scopeListChange(prevScopes, approvedScopes)}`
-      );
-      res.json({ ok: true, approvedScopes });
+      const notice = [
+        'An administrator updated your API permissions.',
+        scopeListChange(prevApproved, approved),
+        allKeysChange(prevAllKeys, allKeys),
+        ...result.strippedKeys.map(
+          (k) => `Removed from key "${k.name}": ${labelScopes(k.removed)}.`
+        ),
+      ]
+        .filter(Boolean)
+        .join(' ');
+      await notifyDeveloperInAppAndEmail(userId, notice);
+      res.json({
+        ok: true,
+        approvedScopes: approved,
+        allKeysScopes: allKeys,
+        strippedKeys: result.strippedKeys,
+      });
     } catch (e) {
       console.error('[admin/developers profile scopes]', e);
       res.status(500).json({ error: 'Failed to update profile scopes' });
@@ -660,7 +698,7 @@ router.patch(
         return res.status(400).json({ error: 'Key not found or not editable' });
       }
       const { scopes, rateLimitPerMinute } = req.body ?? {};
-      if (!isValidScopeList(scopes)) {
+      if (!isScopeIdList(scopes)) {
         return res.status(400).json({ error: 'scopes invalid' });
       }
       const ceiling = normalizeScopes(profile.approved_scopes);

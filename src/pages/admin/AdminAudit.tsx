@@ -82,6 +82,7 @@ import {
   type AuditLogsResponse,
   type AuditLog,
 } from '../../utils/fetch/admin';
+import { toast } from 'sonner';
 
 const ACTION_LABELS: Record<string, string> = {
   ADMIN_DASHBOARD_ACCESSED: 'Dashboard Access',
@@ -342,10 +343,6 @@ export default function AdminAudit() {
   const [dateToFilter, setDateToFilter] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [revealedIPs, setRevealedIPs] = useState<Set<number>>(new Set());
   const [revealingIP, setRevealingIP] = useState<number | null>(null);
   const [clientPage, setClientPage] = useState(1);
@@ -410,10 +407,7 @@ export default function AdminAudit() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch audit logs';
       setError(errorMessage);
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -455,19 +449,12 @@ export default function AdminAudit() {
       setRevealingIP(logId);
       await revealAuditLogIP(logId);
       setRevealedIPs((prev) => new Set(prev).add(logId));
-      setToast({
-        message: 'IP address revealed successfully',
-        type: 'success',
-      });
+      toast.success('IP address revealed successfully');
     } catch (error) {
       console.error('Error revealing IP:', error);
-      setToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to reveal IP address',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to reveal IP address'
+      );
     } finally {
       setRevealingIP(null);
     }
@@ -550,7 +537,7 @@ export default function AdminAudit() {
   const showingTo = Math.min(clientPage * clientLimit, filteredLogs.length);
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Audit Log"
         icon={ShieldAlert}

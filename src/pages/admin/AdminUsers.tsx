@@ -61,6 +61,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL || '';
 
@@ -507,10 +508,6 @@ export default function AdminUsers() {
   const [selectedUserForRole, setSelectedUserForRole] =
     useState<AdminUser | null>(null);
   const [assigningRole, setAssigningRole] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
 
   const filterOptions = [
     { value: 'all', label: 'All users' },
@@ -553,10 +550,7 @@ export default function AdminUsers() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      });
+      toast.error(errorMessage);
       throw err;
     } finally {
       setLoading(false);
@@ -590,18 +584,16 @@ export default function AdminUsers() {
   const handleRemoveRole = async (userId: string, roleId: number) => {
     try {
       await removeRoleFromUser(userId, roleId);
-      setToast({ message: 'Role removed successfully', type: 'success' });
+      toast.success('Role removed successfully');
       const updatedUsers = await fetchData();
       const updatedUser = updatedUsers.find((u) => u.id === userId);
       if (updatedUser) {
         setSelectedUserForRole(updatedUser);
       }
     } catch (error) {
-      setToast({
-        message:
-          error instanceof Error ? error.message : 'Failed to remove role',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to remove role'
+      );
     }
   };
 
@@ -613,15 +605,9 @@ export default function AdminUsers() {
 
       if (roleId) {
         await assignRoleToUser(selectedUserForRole.id, roleId);
-        setToast({
-          message: 'Role assigned successfully',
-          type: 'success',
-        });
+        toast.success('Role assigned successfully');
       } else {
-        setToast({
-          message: 'Please use the Admin Roles page to remove roles',
-          type: 'info',
-        });
+        toast.info('Please use the Admin Roles page to remove roles');
       }
 
       const updatedUsers = await fetchData();
@@ -632,11 +618,9 @@ export default function AdminUsers() {
         setSelectedUserForRole(updatedUser);
       }
     } catch (error) {
-      setToast({
-        message:
-          error instanceof Error ? error.message : 'Failed to update role',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update role'
+      );
     } finally {
       setAssigningRole(false);
     }
@@ -656,19 +640,12 @@ export default function AdminUsers() {
       setRevealingIP(userId);
       await revealUserIP(userId);
       setRevealedIPs((prev) => new Set(prev).add(userId));
-      setToast({
-        message: 'IP address revealed successfully',
-        type: 'success',
-      });
+      toast.success('IP address revealed successfully');
     } catch (error) {
       console.error('Error revealing IP:', error);
-      setToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to reveal IP address',
-        type: 'error',
-      });
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to reveal IP address'
+      );
     } finally {
       setRevealingIP(null);
     }
@@ -771,7 +748,7 @@ export default function AdminUsers() {
     : [];
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Users"
         icon={Users}

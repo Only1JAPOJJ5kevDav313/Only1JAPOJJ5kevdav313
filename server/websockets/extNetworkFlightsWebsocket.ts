@@ -10,7 +10,6 @@ import {
   touchDeveloperApiKeyLastUsed,
   insertDeveloperApiUsage,
 } from '../db/developer.js';
-import { parseScopesFromKey } from '../middleware/developerExtApi.js';
 import { getClientIp } from '../utils/getIpAddress.js';
 import { hashIp } from '../utils/encryption.js';
 import { createHandshakeRateLimiter } from './handshakeRateLimit.js';
@@ -70,8 +69,7 @@ export function setupExtNetworkFlightsWebsocket(httpServer: HTTPServer) {
         return next(new Error('Invalid or missing API key'));
       }
 
-      const scopes = parseScopesFromKey(row.key.scopes);
-      if (!scopes.includes(REQUIRED_SCOPE)) {
+      if (!row.effectiveScopes.includes(REQUIRED_SCOPE)) {
         return next(new Error(`Missing required scope: ${REQUIRED_SCOPE}`));
       }
 

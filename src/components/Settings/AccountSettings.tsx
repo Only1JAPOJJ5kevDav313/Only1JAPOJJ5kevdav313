@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { SiDiscord, SiRoblox } from 'react-icons/si';
 import { useAuth } from '../../hooks/auth/useAuth';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import { updateTutorialStatus } from '../../utils/fetch/auth';
 import type { Settings } from '../../types/settings';
 import PrivacySettings from './PrivacySettings';
@@ -107,7 +107,6 @@ export default function AccountSettings({
 }: AccountSettingsProps) {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const { showError, showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const handledLinkParams = useRef(false);
   const [showVatsimConfirm, setShowVatsimConfirm] = useState(false);
@@ -129,11 +128,11 @@ export default function AccountSettings({
     handledLinkParams.current = true;
 
     if (linked) {
-      showToast('VATSIM account linked', 'success');
+      toast.success('VATSIM account linked');
       refreshUser();
     }
     if (error) {
-      showError(LINK_ERROR_MESSAGES[error] ?? 'Failed to link account');
+      toast.error(LINK_ERROR_MESSAGES[error] ?? 'Failed to link account');
     }
 
     setSearchParams(
@@ -145,7 +144,7 @@ export default function AccountSettings({
       },
       { replace: true }
     );
-  }, [searchParams, setSearchParams, showToast, showError, refreshUser]);
+  }, [searchParams, setSearchParams, refreshUser]);
 
   const handleLinkRoblox = () => {
     window.location.href = `${import.meta.env.VITE_SERVER_URL}/api/auth/roblox`;
@@ -168,20 +167,19 @@ export default function AccountSettings({
       if (res.ok) {
         const data = await res.json();
         await refreshUser();
-        showToast(
+        toast.success(
           data.changed
             ? `VATSIM rating updated to ${data.ratingShort ?? 'unknown'}`
-            : 'VATSIM rating is already up to date',
-          'success'
+            : 'VATSIM rating is already up to date'
         );
       } else if (res.status === 429) {
-        showError('Please wait a moment before refreshing again');
+        toast.error('Please wait a moment before refreshing again');
       } else {
-        showError('Failed to refresh VATSIM rating');
+        toast.error('Failed to refresh VATSIM rating');
       }
     } catch (e) {
       console.error('Refresh VATSIM error:', e);
-      showError('Failed to refresh VATSIM rating');
+      toast.error('Failed to refresh VATSIM rating');
     } finally {
       setVatsimRefreshing(false);
     }
@@ -200,11 +198,11 @@ export default function AccountSettings({
       if (res.ok) {
         await refreshUser();
       } else {
-        showError('Failed to unlink VATSIM account');
+        toast.error('Failed to unlink VATSIM account');
       }
     } catch (e) {
       console.error('Unlink VATSIM error:', e);
-      showError('Failed to unlink VATSIM account');
+      toast.error('Failed to unlink VATSIM account');
     }
   };
 
@@ -222,11 +220,11 @@ export default function AccountSettings({
       if (res.ok) {
         await refreshUser();
       } else {
-        showError('Failed to unlink Roblox account');
+        toast.error('Failed to unlink Roblox account');
       }
     } catch (error) {
       console.error('Error unlinking Roblox:', error);
-      showError('Failed to unlink Roblox account');
+      toast.error('Failed to unlink Roblox account');
     }
   };
 
@@ -263,13 +261,13 @@ export default function AccountSettings({
         window.location.href = '/';
       } else {
         const error = await res.json();
-        showError(
+        toast.error(
           `Failed to delete account: ${error.message || 'Unknown error'}`
         );
       }
     } catch (error) {
       console.error('Error deleting account:', error);
-      showError('Failed to delete account. Please try again.');
+      toast.error('Failed to delete account. Please try again.');
     } finally {
       setDeleteInProgress(false);
     }

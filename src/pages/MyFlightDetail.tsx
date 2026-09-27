@@ -33,6 +33,7 @@ import { useSettings } from '../hooks/settings/useSettings';
 import { fetchBackgrounds } from '../utils/fetch/data';
 import { useData } from '../hooks/data/useData';
 import { parseCallsign } from '../utils/callsignParser';
+import { toast } from 'sonner';
 
 const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
 
@@ -71,7 +72,6 @@ export default function MyFlightDetail() {
   const [copied, setCopied] = useState(false);
   const [featured, setFeatured] = useState(false);
   const [featuredLoading, setFeaturedLoading] = useState(false);
-  const [featuredToast, setFeaturedToast] = useState('');
   const [snaps, setSnaps] = useState<SnapImage[]>([]);
   const [snapUploading, setSnapUploading] = useState(false);
   const [snapError, setSnapError] = useState('');
@@ -218,17 +218,13 @@ export default function MyFlightDetail() {
     try {
       const { featured: newFeatured } = await toggleFeaturedOnProfile(id);
       setFeatured(newFeatured);
-      setFeaturedToast(
-        newFeatured ? 'Added to profile' : 'Removed from profile'
-      );
-      setTimeout(() => setFeaturedToast(''), 2500);
+      toast.success(newFeatured ? 'Added to profile' : 'Removed from profile');
     } catch (err) {
-      setFeaturedToast(
+      toast.error(
         err instanceof Error && err.message === 'CAP_REACHED'
           ? 'Max 3 featured flights'
           : 'Failed to update'
       );
-      setTimeout(() => setFeaturedToast(''), 2500);
     } finally {
       setFeaturedLoading(false);
     }
@@ -299,12 +295,6 @@ export default function MyFlightDetail() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <Navbar />
-
-      {featuredToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full bg-zinc-800 border border-zinc-600 text-sm text-zinc-200 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200">
-          {featuredToast}
-        </div>
-      )}
 
       {lightboxSrc && (
         <div

@@ -65,6 +65,7 @@ import {
   type AdminSession,
   type EventModeState,
 } from '../../utils/fetch/admin';
+import { toast } from 'sonner';
 
 type ViewMode = 'grid' | 'list';
 type SortBy = 'date' | 'airport' | 'creator' | 'controllers' | 'flights';
@@ -126,10 +127,6 @@ export default function AdminSessions() {
     null
   );
   const [showModal, setShowModal] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(100);
   const [totalPages, setTotalPages] = useState(1);
@@ -156,12 +153,11 @@ export default function AdminSessions() {
       setEventModeLoading(true);
       const updated = await setEventMode({ [field]: !eventMode[field] });
       setEventModeState(updated);
-      setToast({
-        message: `${field === 'pfatcEventMode' ? 'PFATC' : 'AATC'} event mode ${updated[field] ? 'enabled' : 'disabled'}`,
-        type: 'success',
-      });
+      toast.success(
+        `${field === 'pfatcEventMode' ? 'PFATC' : 'AATC'} event mode ${updated[field] ? 'enabled' : 'disabled'}`
+      );
     } catch {
-      setToast({ message: 'Failed to update event mode', type: 'error' });
+      toast.error('Failed to update event mode');
     } finally {
       setEventModeLoading(false);
     }
@@ -188,10 +184,7 @@ export default function AdminSessions() {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch sessions';
       setError(errorMessage);
-      setToast({
-        message: errorMessage,
-        type: 'error',
-      });
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -251,19 +244,14 @@ export default function AdminSessions() {
 
     try {
       await deleteAdminSession(sessionId);
-      setToast({
-        message: 'Session deleted successfully',
-        type: 'success',
-      });
+      toast.success('Session deleted successfully');
       setShowModal(false);
       setSelectedSession(null);
       fetchSessions();
     } catch (err) {
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to delete session',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to delete session'
+      );
     }
   };
 
@@ -281,7 +269,7 @@ export default function AdminSessions() {
     updated: Partial<AdminSession>
   ) => {
     mergeSession(sessionId, updated);
-    setToast({ message: 'Session updated', type: 'success' });
+    toast.success('Session updated');
   };
 
   const handleReleaseClaim = async (session: AdminSession) => {
@@ -298,12 +286,11 @@ export default function AdminSessions() {
     try {
       await releaseAdminSessionClaim(session.session_id);
       mergeSession(session.session_id, { external_claim: null });
-      setToast({ message: 'Claim released', type: 'success' });
+      toast.success('Claim released');
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Failed to release claim',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to release claim'
+      );
     }
   };
 
@@ -626,7 +613,7 @@ export default function AdminSessions() {
   const eventModeActive = eventMode.pfatcEventMode || eventMode.aatcEventMode;
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Sessions"
         icon={Server}
@@ -961,7 +948,7 @@ export default function AdminSessions() {
                 onSaved={(updated) =>
                   handleSessionSaved(selectedSession.session_id, updated)
                 }
-                onError={(message) => setToast({ message, type: 'error' })}
+                onError={(message) => toast.error(message)}
               />
             </div>
 

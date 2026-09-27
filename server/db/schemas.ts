@@ -788,6 +788,10 @@ export async function ensureDeveloperApiPolicyColumns() {
     ALTER TABLE developer_profiles
     ADD COLUMN IF NOT EXISTS notification_email varchar(320)
   `.execute(mainDb);
+  await sql`
+    ALTER TABLE developer_profiles
+    ADD COLUMN IF NOT EXISTS all_keys_scopes jsonb NOT NULL DEFAULT '[]'::jsonb
+  `.execute(mainDb);
 
   await sql`
     ALTER TABLE developer_api_keys

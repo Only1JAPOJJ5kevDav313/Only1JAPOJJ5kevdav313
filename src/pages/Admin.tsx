@@ -28,6 +28,7 @@ import {
   type AdminStats,
   type AppVersion,
 } from '../utils/fetch/admin';
+import { toast } from 'sonner';
 
 type ActivityChartView = 'flights' | 'sessions' | 'accounts';
 
@@ -215,10 +216,6 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: 'success' | 'error' | 'info';
-  } | null>(null);
   const [appVersion, setAppVersion] = useState<AppVersion | null>(null);
   const [versionLoading, setVersionLoading] = useState(false);
   const [apiLogStats24h, setApiLogStats24h] = useState<
@@ -261,7 +258,7 @@ export default function Admin() {
       const message =
         err instanceof Error ? err.message : 'Failed to fetch statistics';
       setError(message);
-      setToast({ message, type: 'error' });
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -274,11 +271,9 @@ export default function Admin() {
       setAppVersion(await fetchAppVersion());
     } catch (err) {
       console.error('Error fetching app version:', err);
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to fetch app version',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch app version'
+      );
     } finally {
       setVersionLoading(false);
     }
@@ -289,11 +284,9 @@ export default function Admin() {
       setApiLogStats24h(await fetchApiLogStats24h());
     } catch (err) {
       console.error('Error fetching API log stats:', err);
-      setToast({
-        message:
-          err instanceof Error ? err.message : 'Failed to fetch API log stats',
-        type: 'error',
-      });
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch API log stats'
+      );
     }
   }, []);
 
@@ -316,11 +309,9 @@ export default function Admin() {
       .then((res) => setForecastDrivers(res.drivers))
       .catch((err) => {
         setShowForecast(false);
-        setToast({
-          message:
-            err instanceof Error ? err.message : 'Failed to load forecast',
-          type: 'error',
-        });
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to load forecast'
+        );
       })
       .finally(() => setForecastLoading(false));
   }, [showForecast, forecastDrivers, forecastLoading]);
@@ -422,7 +413,7 @@ export default function Admin() {
   const period = stats?.periodTotals;
 
   return (
-    <AdminLayout toast={toast} onToastClose={() => setToast(null)}>
+    <AdminLayout>
       <AdminPage
         title="Admin Overview"
         icon={BarChart3}

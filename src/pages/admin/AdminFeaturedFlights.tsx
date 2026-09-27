@@ -29,7 +29,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import {
   fetchAdminFeaturedFlights,
   adminUnfeatureFlight,
@@ -48,7 +48,6 @@ type UserGroup = {
 };
 
 export default function AdminFeaturedFlights() {
-  const { showToast, showError } = useToast();
   const { confirm, confirmDialog } = useAdminConfirm();
   const [flights, setFlights] = useState<AdminFeaturedFlight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,23 +80,20 @@ export default function AdminFeaturedFlights() {
     }
   }, []);
 
-  const withBusy = useCallback(
-    async (key: string, fn: () => Promise<void>) => {
-      setBusyKeys((prev) => new Set(prev).add(key));
-      try {
-        await fn();
-      } catch (e) {
-        showError(e instanceof Error ? e.message : 'Action failed');
-      } finally {
-        setBusyKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      }
-    },
-    [showError]
-  );
+  const withBusy = useCallback(async (key: string, fn: () => Promise<void>) => {
+    setBusyKeys((prev) => new Set(prev).add(key));
+    try {
+      await fn();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Action failed');
+    } finally {
+      setBusyKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, []);
 
   const handleUnfeature = useCallback(
     async (userId: string, flightId: string) => {
@@ -114,10 +110,10 @@ export default function AdminFeaturedFlights() {
       void withBusy(`unfeature:${flightId}`, async () => {
         await adminUnfeatureFlight(userId, flightId);
         setFlights((prev) => prev.filter((f) => f.id !== flightId));
-        showToast('Flight unfeatured', 'success');
+        toast.success('Flight unfeatured');
       });
     },
-    [confirm, withBusy, showToast]
+    [confirm, withBusy]
   );
 
   const handleDeleteImage = useCallback(
@@ -145,10 +141,10 @@ export default function AdminFeaturedFlights() {
                 }
           )
         );
-        showToast('Image deleted', 'success');
+        toast.success('Image deleted');
       });
     },
-    [confirm, withBusy, showToast]
+    [confirm, withBusy]
   );
 
   useEffect(() => {

@@ -38,8 +38,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '../../hooks/useToast';
+import { toast } from 'sonner';
 import ScopeTagSelector from '../developers/ScopeTagSelector';
+import AdminScopePermissions from './AdminScopePermissions';
 import {
   approveAdminDeveloperKey,
   fetchAdminDeveloperCatalog,
@@ -53,7 +54,7 @@ import {
   type AdminScopeCatalogEntry,
 } from '../../utils/fetch/adminDevelopers';
 
-type Tab = 'ceiling' | 'keys';
+type Tab = 'permissions' | 'keys';
 
 type Props = {
   developer: AdminDeveloperSummary;
@@ -65,12 +66,6 @@ type Props = {
   onDeleteDeveloper?: () => void | Promise<void>;
   deleteDeveloperBusy?: boolean;
 };
-
-function isAdminOnlyScope(entry: AdminScopeCatalogEntry): boolean {
-  return Boolean(
-    (entry as AdminScopeCatalogEntry & { hidden?: boolean }).hidden
-  );
-}
 
 const STATUS_ICON: Record<string, LucideIcon> = {
   active: CheckCircle2,
@@ -127,17 +122,23 @@ export default function AdminDeveloperEditModal({
   onDeleteDeveloper,
   deleteDeveloperBusy,
 }: Props) {
-  const { showError } = useToast();
   const { confirm, confirmDialog } = useAdminConfirm();
-  const [tab, setTab] = useState<Tab>('ceiling');
+  const [tab, setTab] = useState<Tab>('permissions');
   const [catalog, setCatalog] = useState<AdminScopeCatalogEntry[]>([]);
   const [keys, setKeys] = useState<AdminDeveloperKeyRow[]>([]);
   const [keysLoading, setKeysLoading] = useState(true);
-  const [ceiling, setCeiling] = useState<Set<string>>(
-    () => new Set(developer.approvedScopes)
+  const savedAllowed = useMemo(
+    () => new Set(developer.approvedScopes),
+    [developer.approvedScopes]
   );
-  const [ceilingBusy, setCeilingBusy] = useState(false);
-  const [ceilingSaved, setCeilingSaved] = useState(false);
+  const savedAllKeys = useMemo(
+    () => new Set(developer.allKeysScopes ?? []),
+    [developer.allKeysScopes]
+  );
+  const [allowed, setAllowed] = useState<Set<string>>(savedAllowed);
+  const [allKeys, setAllKeys] = useState<Set<string>>(savedAllKeys);
+  const [permissionsBusy, setPermissionsBusy] = useState(false);
+  const [permissionsSaved, setPermissionsSaved] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [revealedCopied, setRevealedCopied] = useState(false);
@@ -154,8 +155,15 @@ export default function AdminDeveloperEditModal({
   const [editRpm, setEditRpm] = useState('');
 
   useEffect(() => {
-    setCeiling(new Set(developer.approvedScopes));
-  }, [developer.userId, developer.approvedScopes]);
+    setAllowed(new Set(savedAllowed));
+    setAllKeys(new Set(savedAllKeys));
+  }, [developer.userId, savedAllowed, savedAllKeys]);
+
+  const permissionsDirty = useMemo(() => {
+    const same = (a: Set<string>, b: Set<string>) =>
+      a.size === b.size && [...a].every((x) => b.has(x));
+    return !same(allowed, savedAllowed) || !same(allKeys, savedAllKeys);
+  }, [allowed, allKeys, savedAllowed, savedAllKeys]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,22 +199,26 @@ export default function AdminDeveloperEditModal({
     [catalog]
   );
 
-  const adminOnlyScopes = useMemo(
-    () => catalogSorted.filter(isAdminOnlyScope),
-    [catalogSorted]
-  );
-
-  const saveCeiling = async () => {
-    setCeilingBusy(true);
+  const savePermissions = async () => {
+    setPermissionsBusy(true);
     try {
-      await patchAdminDeveloperProfileScopes(developer.userId, [...ceiling]);
-      setCeilingSaved(true);
-      setTimeout(() => setCeilingSaved(false), 2000);
-      await onReload();
+      const { strippedKeys } = await patchAdminDeveloperProfileScopes(
+        developer.userId,
+        [...allowed],
+        [...allKeys]
+      );
+      setPermissionsSaved(true);
+      setTimeout(() => setPermissionsSaved(false), 2000);
+      if (strippedKeys.length > 0) {
+        toast.success(
+          `Removed scopes from ${strippedKeys.length} key${strippedKeys.length === 1 ? '' : 's'}`
+        );
+      }
+      await Promise.all([onReload(), reloadKeys()]);
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      setCeilingBusy(false);
+      setPermissionsBusy(false);
     }
   };
 
@@ -239,7 +251,7 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Approve failed');
+      toast.error(e instanceof Error ? e.message : 'Approve failed');
     } finally {
       setRowBusy(null);
     }
@@ -261,7 +273,7 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Reject failed');
+      toast.error(e instanceof Error ? e.message : 'Reject failed');
     } finally {
       setRowBusy(null);
     }
@@ -269,14 +281,14 @@ export default function AdminDeveloperEditModal({
 
   const openEdit = (k: AdminDeveloperKeyRow) => {
     setEditKey(k);
-    setEditScopes(new Set(k.scopes));
+    setEditScopes(new Set(k.scopes.filter((s) => !savedAllKeys.has(s))));
     setEditRpm(
       k.rateLimitPerMinute != null ? String(k.rateLimitPerMinute) : ''
     );
   };
 
   const saveEdit = async () => {
-    if (!editKey || editScopes.size === 0) return;
+    if (!editKey || editScopes.size + savedAllKeys.size === 0) return;
     setRowBusy(editKey.id);
     try {
       const rpm =
@@ -289,7 +301,7 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Save failed');
+      toast.error(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setRowBusy(null);
     }
@@ -312,7 +324,7 @@ export default function AdminDeveloperEditModal({
       await reloadKeys();
       await onReload();
     } catch (e) {
-      showError(e instanceof Error ? e.message : 'Revoke failed');
+      toast.error(e instanceof Error ? e.message : 'Revoke failed');
     } finally {
       setRowBusy(null);
     }
@@ -334,9 +346,13 @@ export default function AdminDeveloperEditModal({
   );
 
   const editKeyFromCatalog = useMemo(
-    () => catalogSorted.filter((c) => ceiling.has(c.id)),
-    [catalogSorted, ceiling]
+    () => catalogSorted.filter((c) => savedAllowed.has(c.id)),
+    [catalogSorted, savedAllowed]
   );
+
+  const effectiveScopeCount = (k: AdminDeveloperKeyRow) =>
+    new Set([...k.scopes, ...savedAllKeys].filter((s) => savedAllowed.has(s)))
+      .size;
 
   return (
     <>
@@ -344,7 +360,7 @@ export default function AdminDeveloperEditModal({
         open
         onClose={onClose}
         title={developer.username}
-        size="lg"
+        size="full"
         footer={
           <>
             {onDeleteDeveloper ? (
@@ -391,24 +407,26 @@ export default function AdminDeveloperEditModal({
                 Reactivate
               </Button>
             )}
-            {tab === 'ceiling' && (
+            {tab === 'permissions' && (
               <Button
                 type="button"
-                disabled={ceilingBusy || ceiling.size === 0}
-                onClick={() => void saveCeiling()}
+                disabled={
+                  permissionsBusy || !permissionsDirty || allowed.size === 0
+                }
+                onClick={() => void savePermissions()}
               >
-                {ceilingSaved ? (
+                {permissionsSaved ? (
                   <>
                     <Check /> Saved
                   </>
                 ) : (
                   <>
-                    {ceilingBusy ? (
+                    {permissionsBusy ? (
                       <Loader2 className="animate-spin" />
                     ) : (
                       <Save />
                     )}
-                    {ceilingBusy ? 'Saving…' : 'Save ceiling'}
+                    {permissionsBusy ? 'Saving…' : 'Save permissions'}
                   </>
                 )}
               </Button>
@@ -444,7 +462,15 @@ export default function AdminDeveloperEditModal({
             className="w-full sm:w-auto"
             aria-label="Developer edit sections"
           >
-            <TabsTrigger value="ceiling">Scope ceiling</TabsTrigger>
+            <TabsTrigger value="permissions">
+              Permissions
+              {permissionsDirty && (
+                <span
+                  className="size-1.5 rounded-full bg-amber-500"
+                  aria-label="Unsaved changes"
+                />
+              )}
+            </TabsTrigger>
             <TabsTrigger value="keys">
               Keys
               {developer.keysPending > 0 && (
@@ -455,33 +481,33 @@ export default function AdminDeveloperEditModal({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="ceiling" className="flex flex-col gap-5">
-            <ScopeTagSelector
-              catalog={catalog}
-              selected={ceiling}
-              onChange={setCeiling}
-            />
-            {adminOnlyScopes.length > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Admin-only, granted here only:{' '}
-                {adminOnlyScopes.map((s, i) => (
-                  <span key={s.id}>
-                    {i > 0 ? ', ' : null}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span tabIndex={0} className="cursor-default font-mono">
-                          {s.id}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{s.label}</TooltipContent>
-                    </Tooltip>
-                  </span>
-                ))}
-              </p>
-            ) : null}
+          <TabsContent value="permissions">
+            {catalog.length === 0 ? (
+              <AdminLoading label="Loading scopes…" className="py-12" />
+            ) : (
+              <AdminScopePermissions
+                catalog={catalog}
+                allowed={allowed}
+                allKeys={allKeys}
+                savedAllowed={savedAllowed}
+                savedAllKeys={savedAllKeys}
+                keys={keys}
+                disabled={permissionsBusy}
+                onChange={(a, all) => {
+                  setAllowed(a);
+                  setAllKeys(all);
+                }}
+              />
+            )}
           </TabsContent>
 
-          <TabsContent value="keys">
+          <TabsContent value="keys" className="flex flex-col gap-4">
+            {permissionsDirty ? (
+              <p className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                You have unsaved permission changes. Keys use the saved
+                permissions until you save them on the Permissions tab.
+              </p>
+            ) : null}
             {keysLoading ? (
               <AdminLoading label="Loading keys…" className="py-12" />
             ) : keys.length === 0 ? (
@@ -492,6 +518,7 @@ export default function AdminDeveloperEditModal({
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Scopes</TableHead>
                     <TableHead>RPM</TableHead>
                     <TableHead>Last used</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -514,6 +541,11 @@ export default function AdminDeveloperEditModal({
                           <AdminStatusBadge status={st} icon={STATUS_ICON[st]}>
                             {capitalize(st)}
                           </AdminStatusBadge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {k.status === 'active' && !k.revokedAt
+                            ? effectiveScopeCount(k)
+                            : '–'}
                         </TableCell>
                         <TableCell className="tabular-nums">
                           {k.rateLimitPerMinute ?? (
@@ -607,12 +639,19 @@ export default function AdminDeveloperEditModal({
         {approveKey && (
           <div className="grid gap-5">
             <div className="grid gap-2">
-              <Label>Allowed scopes</Label>
+              <Label>Requested scopes to approve</Label>
               <ScopeTagSelector
                 catalog={approveKeyFromCatalog}
                 selected={approveScopes}
                 onChange={setApproveScopes}
               />
+              {savedAllKeys.size > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Plus {savedAllKeys.size} scope
+                  {savedAllKeys.size === 1 ? '' : 's'} set to "All keys" on the
+                  Permissions tab, added automatically.
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="admin-dev-approve-rpm">
@@ -685,7 +724,9 @@ export default function AdminDeveloperEditModal({
             </Button>
             <Button
               type="button"
-              disabled={editScopes.size === 0 || rowBusy != null}
+              disabled={
+                editScopes.size + savedAllKeys.size === 0 || rowBusy != null
+              }
               onClick={() => void saveEdit()}
             >
               {rowBusy != null && editKey && rowBusy === editKey.id ? (
@@ -700,10 +741,16 @@ export default function AdminDeveloperEditModal({
           <div className="grid gap-5">
             <div className="grid gap-2">
               <Label>Scopes</Label>
+              <p className="text-xs text-muted-foreground">
+                Only scopes set to "Allowed" or "All keys" on the Permissions
+                tab are listed. "All keys" scopes can't be removed per key.
+              </p>
               <ScopeTagSelector
                 catalog={editKeyFromCatalog}
                 selected={editScopes}
                 onChange={setEditScopes}
+                locked={savedAllKeys}
+                lockedLabel="All keys"
               />
             </div>
             <div className="grid gap-2">
