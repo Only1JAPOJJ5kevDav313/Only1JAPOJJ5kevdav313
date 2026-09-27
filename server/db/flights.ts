@@ -886,6 +886,48 @@ export async function getPublicFlightById(flightId: string) {
   return flight;
 }
 
+function toFlightColumn(key: string): string {
+  if (key === 'cruisingFL') return 'cruisingfl';
+  if (key === 'clearedFL') return 'clearedfl';
+  return key;
+}
+
+function isSameFlightValue(
+  column: string,
+  current: unknown,
+  next: unknown
+): boolean {
+  if (column === 'clearance')
+    return normalizeClearance(current) === normalizeClearance(next);
+  const isEmpty = (v: unknown) => v === null || v === undefined || v === '';
+  if (isEmpty(current) || isEmpty(next))
+    return isEmpty(current) && isEmpty(next);
+  if (current instanceof Date)
+    return new Date(next as string).getTime() === current.getTime();
+  if (
+    (column === 'departure' || column === 'arrival') &&
+    typeof next === 'string'
+  )
+    return next.toUpperCase() === current;
+  return current === next;
+}
+
+export function dropUnchangedFlightFields(
+  current: object | null | undefined,
+  updates: Record<string, unknown>
+): Record<string, unknown> {
+  if (!current) return updates;
+  const row = current as Record<string, unknown>;
+  const changed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    const column = toFlightColumn(key);
+    if (!(column in row) || !isSameFlightValue(column, row[column], value)) {
+      changed[key] = value;
+    }
+  }
+  return changed;
+}
+
 export async function updateFlight(
   sessionId: string,
   flightId: string,
@@ -922,9 +964,7 @@ export async function updateFlight(
 
   const dbUpdates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(updates)) {
-    let dbKey = key;
-    if (key === 'cruisingFL') dbKey = 'cruisingfl';
-    if (key === 'clearedFL') dbKey = 'clearedfl';
+    const dbKey = toFlightColumn(key);
     if (allowedColumns.includes(dbKey)) {
       if (
         (dbKey === 'departure' || dbKey === 'arrival') &&

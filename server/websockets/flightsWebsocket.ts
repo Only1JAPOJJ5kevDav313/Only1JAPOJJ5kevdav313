@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import {
   addFlight,
   updateFlight,
+  dropUnchangedFlightFields,
   deleteFlight,
   type AddFlightData,
   type ClientFlight,
@@ -294,25 +295,22 @@ export function setupFlightsWebsocket(httpServer: HTTPServer): SocketIOServer {
             }
           }
 
-          if (
-            socket.data.role === 'controller' &&
-            updates &&
-            Object.keys(updates).length > 0
-          ) {
-            if (userId) {
-              incrementStat(
-                userId,
-                'total_flight_edits',
-                1,
-                'total_edit_actions'
-              );
-            }
+          const changes = dropUnchangedFlightFields(oldFlight, updates);
+          if (Object.keys(changes).length === 0) return;
+
+          if (userId) {
+            incrementStat(
+              userId,
+              'total_flight_edits',
+              1,
+              'total_edit_actions'
+            );
           }
 
           const updatedFlight = await updateFlight(
             sessionId,
             flightId as string,
-            updates
+            changes
           );
           if (updatedFlight) {
             io.to(sessionId).emit('flightUpdated', updatedFlight);
@@ -328,10 +326,6 @@ export function setupFlightsWebsocket(httpServer: HTTPServer): SocketIOServer {
             const flightOwner = flightOwnerUserId
               ? await getUserById(flightOwnerUserId)
               : null;
-            const changedData: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(updates)) {
-              changedData[key] = value;
-            }
             await logFlightAction({
               userId: userId || 'unknown',
               username: username || 'unknown',
@@ -343,7 +337,7 @@ export function setupFlightsWebsocket(httpServer: HTTPServer): SocketIOServer {
                 flight_owner_user_id: flightOwnerUserId || null,
                 flight_owner_username: flightOwner?.username || null,
               },
-              newData: changedData,
+              newData: changes,
               ipAddress: getSocketClientIp(socket),
             });
           } else {

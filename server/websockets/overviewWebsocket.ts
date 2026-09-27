@@ -1,5 +1,9 @@
 import { Server as SocketServer } from 'socket.io';
-import { updateFlight, getFlightById } from '../db/flights.js';
+import {
+  updateFlight,
+  getFlightById,
+  dropUnchangedFlightFields,
+} from '../db/flights.js';
 import { getUserById } from '../db/users.js';
 import {
   getOverviewForClient,
@@ -216,10 +220,16 @@ export function setupOverviewWebsocket(
             flightId as string
           );
 
+          const changes = dropUnchangedFlightFields(oldFlight, updates);
+          if (Object.keys(changes).length === 0) {
+            socket.emit('flightUpdateAck', { flightId, updates });
+            return;
+          }
+
           const updatedFlight = await updateFlight(
             validSessionId,
             flightId as string,
-            updates
+            changes
           );
 
           if (updatedFlight) {

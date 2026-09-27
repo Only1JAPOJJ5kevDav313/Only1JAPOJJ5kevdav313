@@ -19,6 +19,7 @@ import {
   getFlightsBySessionForDeveloperApi,
   sanitizeFlightForClient,
   updateFlight,
+  dropUnchangedFlightFields,
 } from '../../db/flights.js';
 import { addSessionToUser, getUserById } from '../../db/users.js';
 import { logFlightAction } from '../../db/flightLogs.js';
@@ -407,7 +408,17 @@ router.put(
               };
             }
 
-            const flight = await updateFlight(sessionId, flightId, fields);
+            const changes = dropUnchangedFlightFields(before, fields);
+            if (before && Object.keys(changes).length === 0) {
+              return {
+                sessionId,
+                flightId,
+                ok: true,
+                flight: sanitizeFlightForClient(before),
+              };
+            }
+
+            const flight = await updateFlight(sessionId, flightId, changes);
             broadcastFlightEvent(sessionId, 'flightUpdated', flight);
 
             await logFlightAction({

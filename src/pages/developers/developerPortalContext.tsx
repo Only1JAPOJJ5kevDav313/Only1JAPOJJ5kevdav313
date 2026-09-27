@@ -205,12 +205,6 @@ export function DeveloperPortalProvider({ children }: { children: ReactNode }) {
     }
   }, [profileActive, usageChartWindow, loadDashboard]);
 
-  useEffect(() => {
-    if (profileActive && approvedScopes.length > 0 && newKeyScopes.size === 0) {
-      setNewKeyScopes(new Set(approvedScopes));
-    }
-  }, [profileActive, approvedScopes, newKeyScopes.size]);
-
   const scopeLabelMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of catalog) m.set(c.id, c.label);
@@ -319,6 +313,7 @@ export function DeveloperPortalProvider({ children }: { children: ReactNode }) {
         setInfoMessage(r.message);
       }
       setNewKeyName('');
+      setNewKeyScopes(new Set());
       await Promise.all([loadDashboard(), loadApplication()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create key failed');
