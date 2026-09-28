@@ -53,6 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Tooltip,
   TooltipContent,
@@ -152,6 +153,7 @@ export default function AdminSurveys() {
   const [total, setTotal] = useState(0);
   const [editor, setEditor] = useState<EditorState>(null);
   const [activeBusy, setActiveBusy] = useState(false);
+  const [weighted, setWeighted] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   useEffect(() => {
@@ -491,22 +493,46 @@ export default function AdminSurveys() {
             />
 
             <section className="grid gap-4">
-              <div className="grid gap-1">
-                <h2 className="text-sm font-medium">Results per question</h2>
-                <p className="text-xs text-muted-foreground">
-                  The white marker shows the result weighted by answer time.
-                  Surveys finished faster than{' '}
-                  {(results.timing.fullWeightMsPerQuestion / 1000).toFixed(1)}s
-                  per question count less, down to 10% at instant clicks.
-                </p>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="grid gap-1">
+                  <h2 className="text-sm font-medium">Results per question</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Weighted results count surveys finished faster than{' '}
+                    {(results.timing.fullWeightMsPerQuestion / 1000).toFixed(1)}
+                    s per question less, down to 10% at instant clicks.
+                  </p>
+                </div>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={weighted ? 'weighted' : 'normal'}
+                  onValueChange={(v) => {
+                    if (v) setWeighted(v === 'weighted');
+                  }}
+                  aria-label="Result view"
+                >
+                  <ToggleGroupItem value="normal" className="px-3">
+                    Normal
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="weighted" className="px-3">
+                    Weighted
+                  </ToggleGroupItem>
+                </ToggleGroup>
               </div>
               <div className="grid gap-x-8 gap-y-6 lg:grid-cols-3">
                 {questions.map((q, i) => {
-                  const answered = q.yes + q.no;
-                  const yesPct = pct(q.yes, answered);
+                  const yes = weighted ? q.weightedYes : q.yes;
+                  const no = weighted ? q.weightedNo : q.no;
+                  const answered = yes + no;
+                  const yesPct = pct(yes, answered);
                   const noPct = answered > 0 ? 100 - yesPct : 0;
-                  const weightedTotal = q.weightedYes + q.weightedNo;
-                  const weightedYesPct = pct(q.weightedYes, weightedTotal);
+                  const count = (n: number) =>
+                    weighted
+                      ? n.toLocaleString(undefined, {
+                          maximumFractionDigits: 1,
+                        })
+                      : n.toLocaleString();
                   return (
                     <div key={q.id} className="grid content-start gap-3">
                       <p className="text-sm text-zinc-300">
@@ -515,46 +541,30 @@ export default function AdminSurveys() {
                         </span>{' '}
                         {q.text}
                       </p>
-                      <div className="relative">
+                      <div
+                        className="flex h-2.5 overflow-hidden rounded-full bg-zinc-800"
+                        role="img"
+                        aria-label={`${count(yes)} yes, ${count(no)} no`}
+                      >
                         <div
-                          className="flex h-2.5 overflow-hidden rounded-full bg-zinc-800"
-                          role="img"
-                          aria-label={`${q.yes} yes, ${q.no} no`}
-                        >
-                          <div
-                            className="h-full bg-green-600"
-                            style={{ width: `${yesPct}%` }}
-                          />
-                          <div
-                            className="h-full bg-red-600"
-                            style={{ width: `${noPct}%` }}
-                          />
-                        </div>
-                        {weightedTotal > 0 ? (
-                          <div
-                            className="absolute -top-1 h-[1.125rem] w-1 -translate-x-1/2 rounded-full bg-white shadow-[0_0_0_2px_rgb(9_9_11)]"
-                            style={{ left: `${weightedYesPct}%` }}
-                            role="img"
-                            aria-label={`Weighted: ${weightedYesPct}% yes`}
-                          />
-                        ) : null}
+                          className="h-full bg-green-600"
+                          style={{ width: `${yesPct}%` }}
+                        />
+                        <div
+                          className="h-full bg-red-600"
+                          style={{ width: `${noPct}%` }}
+                        />
                       </div>
                       <div className="flex items-center justify-between text-xs tabular-nums">
                         <span className="inline-flex items-center gap-1 text-green-500">
                           <Check className="size-3.5" aria-hidden />
-                          Yes {q.yes.toLocaleString()} ({yesPct}%)
+                          Yes {count(yes)} ({yesPct}%)
                         </span>
                         <span className="inline-flex items-center gap-1 text-red-500">
                           <X className="size-3.5" aria-hidden />
-                          No {q.no.toLocaleString()} ({noPct}%)
+                          No {count(no)} ({noPct}%)
                         </span>
                       </div>
-                      {weightedTotal > 0 ? (
-                        <p className="text-xs text-zinc-400 tabular-nums">
-                          Weighted: {weightedYesPct}% yes ·{' '}
-                          {100 - weightedYesPct}% no
-                        </p>
-                      ) : null}
                     </div>
                   );
                 })}
