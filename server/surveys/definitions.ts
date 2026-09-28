@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export interface SurveyQuestion {
   id: string;
   text: string;
@@ -11,7 +13,14 @@ export interface SurveyDefinition {
   questions: SurveyQuestion[];
 }
 
-export const SURVEYS: SurveyDefinition[] = [
+export const SURVEY_LIMITS = {
+  title: 120,
+  description: 500,
+  questionText: 300,
+  maxQuestions: 10,
+} as const;
+
+export const SEED_SURVEYS: SurveyDefinition[] = [
   {
     id: 'scope-usage-2026-09',
     title: 'Help us shape PFControl',
@@ -35,16 +44,77 @@ export const SURVEYS: SurveyDefinition[] = [
   },
 ];
 
-export function getSurvey(id: string): SurveyDefinition | undefined {
-  return SURVEYS.find((s) => s.id === id);
+export function newSurveyId(): string {
+  return `survey-${crypto.randomBytes(5).toString('hex')}`;
 }
 
-export function getActiveSurvey(): SurveyDefinition | undefined {
-  return SURVEYS.find((s) => s.active);
+function newQuestionId(): string {
+  return `q_${crypto.randomBytes(4).toString('hex')}`;
+}
+
+export type SurveyInput = Pick<
+  SurveyDefinition,
+  'title' | 'description' | 'questions'
+>;
+
+export function validateSurveyInput(
+  raw: unknown
+): { ok: true; value: SurveyInput } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object') {
+    return { ok: false, error: 'Invalid survey' };
+  }
+  const input = raw as Record<string, unknown>;
+  const title = typeof input.title === 'string' ? input.title.trim() : '';
+  const description =
+    typeof input.description === 'string' ? input.description.trim() : '';
+  if (!title || title.length > SURVEY_LIMITS.title) {
+    return {
+      ok: false,
+      error: `Title is required (max ${SURVEY_LIMITS.title} characters).`,
+    };
+  }
+  if (description.length > SURVEY_LIMITS.description) {
+    return {
+      ok: false,
+      error: `Description is too long (max ${SURVEY_LIMITS.description} characters).`,
+    };
+  }
+  if (
+    !Array.isArray(input.questions) ||
+    input.questions.length === 0 ||
+    input.questions.length > SURVEY_LIMITS.maxQuestions
+  ) {
+    return {
+      ok: false,
+      error: `A survey needs 1 to ${SURVEY_LIMITS.maxQuestions} questions.`,
+    };
+  }
+
+  const seen = new Set<string>();
+  const questions: SurveyQuestion[] = [];
+  for (const q of input.questions as unknown[]) {
+    const item = (q ?? {}) as Record<string, unknown>;
+    const text = typeof item.text === 'string' ? item.text.trim() : '';
+    if (!text || text.length > SURVEY_LIMITS.questionText) {
+      return {
+        ok: false,
+        error: `Every question needs text (max ${SURVEY_LIMITS.questionText} characters).`,
+      };
+    }
+    let id =
+      typeof item.id === 'string' && /^[a-z0-9_-]{1,64}$/i.test(item.id)
+        ? item.id
+        : newQuestionId();
+    while (seen.has(id)) id = newQuestionId();
+    seen.add(id);
+    questions.push({ id, text });
+  }
+
+  return { ok: true, value: { title, description, questions } };
 }
 
 export function validateSurveyAnswers(
-  survey: SurveyDefinition,
+  survey: Pick<SurveyDefinition, 'questions'>,
   raw: unknown
 ): Record<string, boolean> | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;

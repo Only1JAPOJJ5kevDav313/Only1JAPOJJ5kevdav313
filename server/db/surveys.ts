@@ -1,7 +1,163 @@
 import { sql } from 'kysely';
 import { mainDb } from './connection.js';
+import type {
+  SurveyDefinition,
+  SurveyInput,
+  SurveyQuestion,
+} from '../surveys/definitions.js';
 
 export type SurveyAnswers = Record<string, boolean>;
+
+export interface StoredSurvey extends SurveyDefinition {
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function parseQuestions(raw: unknown): SurveyQuestion[] {
+  let value = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (q): q is SurveyQuestion =>
+      !!q && typeof q.id === 'string' && typeof q.text === 'string'
+  );
+}
+
+function toSurvey(row: {
+  id: string;
+  title: string;
+  description: string;
+  questions: unknown;
+  active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}): StoredSurvey {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    questions: parseQuestions(row.questions),
+    active: row.active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function listSurveys(): Promise<StoredSurvey[]> {
+  const rows = await mainDb
+    .selectFrom('surveys')
+    .selectAll()
+    .orderBy('created_at', 'desc')
+    .execute();
+  return rows.map(toSurvey);
+}
+
+export async function getSurveyById(id: string): Promise<StoredSurvey | null> {
+  const row = await mainDb
+    .selectFrom('surveys')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst();
+  return row ? toSurvey(row) : null;
+}
+
+export async function getActiveSurvey(): Promise<StoredSurvey | null> {
+  const row = await mainDb
+    .selectFrom('surveys')
+    .selectAll()
+    .where('active', '=', true)
+    .executeTakeFirst();
+  return row ? toSurvey(row) : null;
+}
+
+export async function createSurvey(
+  id: string,
+  input: SurveyInput,
+  createdBy: string | null
+): Promise<StoredSurvey> {
+  const row = await mainDb
+    .insertInto('surveys')
+    .values({
+      id,
+      title: input.title,
+      description: input.description,
+      questions: sql`CAST(${JSON.stringify(input.questions)} AS jsonb)`,
+      created_by: createdBy,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  return toSurvey(row);
+}
+
+export async function updateSurvey(
+  id: string,
+  input: SurveyInput
+): Promise<StoredSurvey | null> {
+  const row = await mainDb
+    .updateTable('surveys')
+    .set({
+      title: input.title,
+      description: input.description,
+      questions: sql`CAST(${JSON.stringify(input.questions)} AS jsonb)`,
+      updated_at: new Date(),
+    })
+    .where('id', '=', id)
+    .returningAll()
+    .executeTakeFirst();
+  return row ? toSurvey(row) : null;
+}
+
+export async function setSurveyActive(
+  id: string,
+  active: boolean
+): Promise<StoredSurvey | null> {
+  return mainDb.transaction().execute(async (trx) => {
+    if (active) {
+      await trx
+        .updateTable('surveys')
+        .set({ active: false, updated_at: new Date() })
+        .where('active', '=', true)
+        .where('id', '!=', id)
+        .execute();
+    }
+    const row = await trx
+      .updateTable('surveys')
+      .set({ active, updated_at: new Date() })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+    return row ? toSurvey(row) : null;
+  });
+}
+
+export async function deleteSurvey(id: string): Promise<boolean> {
+  return mainDb.transaction().execute(async (trx) => {
+    await trx
+      .deleteFrom('survey_responses')
+      .where('survey_id', '=', id)
+      .execute();
+    const result = await trx
+      .deleteFrom('surveys')
+      .where('id', '=', id)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0) > 0;
+  });
+}
+
+export async function countSurveyResponses(): Promise<Map<string, number>> {
+  const rows = await mainDb
+    .selectFrom('survey_responses')
+    .select(['survey_id', sql<string>`count(*)`.as('count')])
+    .groupBy('survey_id')
+    .execute();
+  return new Map(rows.map((r) => [r.survey_id, Number(r.count)]));
+}
 
 function parseAnswers(raw: unknown): SurveyAnswers {
   let value = raw;

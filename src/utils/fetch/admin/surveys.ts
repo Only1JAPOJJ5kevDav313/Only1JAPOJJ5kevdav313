@@ -9,6 +9,13 @@ export interface AdminSurveySummary {
   active: boolean;
   questionCount: number;
   totalResponses: number;
+  createdAt: string;
+}
+
+export interface AdminSurveyInput {
+  title: string;
+  description: string;
+  questions: { id?: string; text: string }[];
 }
 
 export interface AdminSurveyResults {
@@ -71,4 +78,46 @@ export async function resetAdminSurveyResponse(
     `/${encodeURIComponent(surveyId)}/responses/${encodeURIComponent(userId)}`,
     { method: 'DELETE' }
   );
+}
+
+function jsonInit(method: string, body?: unknown): RequestInit {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  };
+}
+
+export async function createAdminSurvey(
+  input: AdminSurveyInput
+): Promise<{ id: string }> {
+  const data = await adminRequest<{ survey: { id: string } }>(
+    '',
+    jsonInit('POST', input)
+  );
+  return data.survey;
+}
+
+export async function updateAdminSurvey(
+  surveyId: string,
+  input: AdminSurveyInput
+): Promise<void> {
+  await adminRequest(
+    `/${encodeURIComponent(surveyId)}`,
+    jsonInit('PUT', input)
+  );
+}
+
+export async function setAdminSurveyActive(
+  surveyId: string,
+  active: boolean
+): Promise<void> {
+  await adminRequest(
+    `/${encodeURIComponent(surveyId)}/${active ? 'activate' : 'deactivate'}`,
+    jsonInit('POST')
+  );
+}
+
+export async function deleteAdminSurvey(surveyId: string): Promise<void> {
+  await adminRequest(`/${encodeURIComponent(surveyId)}`, jsonInit('DELETE'));
 }

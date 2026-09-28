@@ -8,6 +8,7 @@ import { BansTable } from './main/BansTable';
 import { NotificationsTable } from './main/NotificationsTable';
 import { UserNotificationsTable } from './main/UserNotificationsTable';
 import { SurveyResponsesTable } from './main/SurveyResponsesTable';
+import { SurveysTable } from './main/SurveysTable';
 import { TestersTable } from './main/TestersTable';
 import { TesterSettingsTable } from './main/TesterSettingsTable';
 import { DailyStatisticsTable } from './main/DailyStatisticsTable';
@@ -43,6 +44,7 @@ export interface MainDatabase {
   notifications: NotificationsTable;
   user_notifications: UserNotificationsTable;
   survey_responses: SurveyResponsesTable;
+  surveys: SurveysTable;
   testers: TestersTable;
   tester_settings: TesterSettingsTable;
   daily_statistics: DailyStatisticsTable;

@@ -4,7 +4,13 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Loader2,
+  Pencil,
+  Play,
+  Plus,
   RotateCcw,
+  Square,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
@@ -14,6 +20,8 @@ import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import AdminSearchInput from '../../components/admin/AdminSearchInput';
 import AdminSelect from '../../components/admin/AdminSelect';
 import AdminStatCards from '../../components/admin/AdminStatCards';
+import AdminSurveyEditor from '../../components/admin/AdminSurveyEditor';
+import AdminTable from '../../components/admin/AdminTable';
 import AdminToolbar from '../../components/admin/AdminToolbar';
 import {
   AdminEmptyState,
@@ -22,16 +30,29 @@ import {
 } from '../../components/admin/AdminStates';
 import { useAdminConfirm } from '../../components/admin/useAdminConfirm';
 import {
+  createAdminSurvey,
+  deleteAdminSurvey,
   fetchAdminSurveyResponses,
   fetchAdminSurveyResults,
   fetchAdminSurveys,
   resetAdminSurveyResponse,
+  setAdminSurveyActive,
+  updateAdminSurvey,
+  type AdminSurveyInput,
   type AdminSurveyResponse,
   type AdminSurveyResults,
   type AdminSurveySummary,
 } from '../../utils/fetch/admin/surveys';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Tooltip,
   TooltipContent,
@@ -75,12 +96,42 @@ function QuestionTag({ index, text }: { index: number; text: string }) {
   );
 }
 
+function UserCell({ r }: { r: AdminSurveyResponse }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar>
+        {r.avatar ? (
+          <AvatarImage
+            src={`https://cdn.discordapp.com/avatars/${r.userId}/${r.avatar}.png`}
+            alt={r.username}
+          />
+        ) : null}
+        <AvatarFallback>
+          <UserRound className="size-4 text-zinc-500" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className="truncate font-medium">{r.username}</p>
+        <p className="truncate font-mono text-xs text-muted-foreground">
+          {r.userId}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function pct(part: number, total: number) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
+type EditorState =
+  | { mode: 'create' }
+  | { mode: 'edit'; initial: AdminSurveyInput; responseCount: number }
+  | null;
+
 export default function AdminSurveys() {
   const [surveys, setSurveys] = useState<AdminSurveySummary[]>([]);
+  const [surveysLoaded, setSurveysLoaded] = useState(false);
   const [surveyId, setSurveyId] = useState<string | null>(null);
   const [results, setResults] = useState<AdminSurveyResults | null>(null);
   const [responses, setResponses] = useState<AdminSurveyResponse[]>([]);
@@ -92,6 +143,8 @@ export default function AdminSurveys() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [editor, setEditor] = useState<EditorState>(null);
+  const [activeBusy, setActiveBusy] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   useEffect(() => {
@@ -103,21 +156,27 @@ export default function AdminSurveys() {
     return () => clearTimeout(timer);
   }, [search, debouncedSearch]);
 
-  const loadSurveys = useCallback(async () => {
+  const loadSurveys = useCallback(async (selectId?: string | null) => {
     try {
       const list = await fetchAdminSurveys();
       setSurveys(list);
-      setSurveyId(
-        (current) =>
-          current ?? list.find((s) => s.active)?.id ?? list[0]?.id ?? null
-      );
-      if (list.length === 0) setLoading(false);
+      setSurveyId((current) => {
+        const wanted = selectId === undefined ? current : selectId;
+        if (wanted && list.some((s) => s.id === wanted)) return wanted;
+        return list.find((s) => s.active)?.id ?? list[0]?.id ?? null;
+      });
+      if (list.length === 0) {
+        setResults(null);
+        setLoading(false);
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to load surveys';
       setError(message);
       setLoading(false);
       toast.error(message);
+    } finally {
+      setSurveysLoaded(true);
     }
   }, []);
 
@@ -177,6 +236,9 @@ export default function AdminSurveys() {
   };
 
   const questions = useMemo(() => results?.questions ?? [], [results]);
+  const selected = surveys.find((s) => s.id === surveyId) ?? null;
+  const activeSurvey = surveys.find((s) => s.active) ?? null;
+  const totalResponses = results?.totalResponses ?? 0;
 
   const handleReset = async (r: AdminSurveyResponse) => {
     if (!surveyId) return;
@@ -201,22 +263,134 @@ export default function AdminSurveys() {
     });
   };
 
-  const totalResponses = results?.totalResponses ?? 0;
+  const handleToggleActive = async () => {
+    if (!selected) return;
+    const activate = !selected.active;
+    const run = async () => {
+      setActiveBusy(true);
+      try {
+        await minDuration(setAdminSurveyActive(selected.id, activate));
+        toast.success(
+          activate ? `"${selected.title}" is now active` : 'Survey deactivated'
+        );
+        await loadSurveys(selected.id);
+        await loadResults();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to update survey'
+        );
+        throw err;
+      } finally {
+        setActiveBusy(false);
+      }
+    };
+
+    if (!activate) {
+      await run().catch(() => {});
+      return;
+    }
+    await confirm({
+      title: `Activate "${selected.title}"?`,
+      description:
+        activeSurvey && activeSurvey.id !== selected.id
+          ? `Every logged-in user who hasn't answered it will be asked to fill it in. "${activeSurvey.title}" will be deactivated.`
+          : "Every logged-in user who hasn't answered it will be asked to fill it in.",
+      confirmText: 'Activate',
+      action: run,
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    await confirm({
+      title: `Delete "${selected.title}"?`,
+      description: `The survey and all ${selected.totalResponses.toLocaleString()} response${selected.totalResponses === 1 ? '' : 's'} are deleted permanently.`,
+      confirmText: 'Delete',
+      destructive: true,
+      action: async () => {
+        try {
+          await minDuration(deleteAdminSurvey(selected.id));
+          toast.success('Survey deleted');
+          await loadSurveys(null);
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to delete survey'
+          );
+          throw err;
+        }
+      },
+    });
+  };
+
+  const openEdit = () => {
+    if (!results) return;
+    setEditor({
+      mode: 'edit',
+      initial: {
+        title: results.survey.title,
+        description: results.survey.description,
+        questions: results.questions.map((q) => ({ id: q.id, text: q.text })),
+      },
+      responseCount: results.totalResponses,
+    });
+  };
+
+  const handleSave = async (input: AdminSurveyInput) => {
+    if (editor?.mode === 'edit' && surveyId) {
+      await updateAdminSurvey(surveyId, input);
+      toast.success('Survey saved');
+      setEditor(null);
+      await loadSurveys(surveyId);
+      await loadResults();
+    } else {
+      const { id } = await createAdminSurvey(input);
+      toast.success('Survey created');
+      setEditor(null);
+      setPage(1);
+      await loadSurveys(id);
+    }
+  };
+
+  const renderReset = (r: AdminSurveyResponse) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => void handleReset(r)}
+          className="cursor-pointer text-destructive hover:text-destructive"
+          aria-label={`Reset ${r.username}'s answers`}
+        >
+          <RotateCcw />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="shadcn-scope">Reset answers</TooltipContent>
+    </Tooltip>
+  );
 
   return (
     <AdminLayout>
       <AdminPage
         title="Surveys"
         icon={ClipboardList}
-        description={results?.survey.description}
+        description={results?.survey.description || undefined}
         actions={
-          <AdminRefreshButton
-            onClick={refresh}
-            loading={loading || listLoading}
-          />
+          <>
+            <AdminRefreshButton
+              onClick={refresh}
+              loading={loading || listLoading}
+            />
+            <Button
+              className="cursor-pointer"
+              onClick={() => setEditor({ mode: 'create' })}
+            >
+              <Plus />
+              New survey
+            </Button>
+          </>
         }
       >
-        {surveys.length > 1 ? (
+        {surveys.length > 0 ? (
           <AdminToolbar>
             <AdminSelect
               options={surveys.map((s) => ({
@@ -227,23 +401,58 @@ export default function AdminSurveys() {
               onChange={(value) => {
                 setSurveyId(value);
                 setPage(1);
+                setSearch('');
+                setDebouncedSearch('');
               }}
               aria-label="Survey"
-              className="sm:w-72"
+              className="sm:w-80"
             />
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={openEdit}
+              disabled={!results}
+            >
+              <Pencil />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => void handleToggleActive()}
+              disabled={!selected || activeBusy}
+            >
+              {activeBusy ? (
+                <Loader2 className="animate-spin" />
+              ) : selected?.active ? (
+                <Square />
+              ) : (
+                <Play />
+              )}
+              {selected?.active ? 'Deactivate' : 'Activate'}
+            </Button>
+            <Button
+              variant="outline"
+              className="cursor-pointer border-red-600 text-red-600 hover:bg-red-600 hover:text-white dark:hover:bg-red-600"
+              onClick={() => void handleDelete()}
+              disabled={!selected}
+            >
+              <Trash2 />
+              Delete
+            </Button>
           </AdminToolbar>
         ) : null}
 
-        {loading && !results ? (
-          <AdminLoading label="Loading survey results…" />
+        {!surveysLoaded || (loading && !results) ? (
+          <AdminLoading label="Loading surveys…" />
         ) : error ? (
           <AdminErrorState
-            title="Error loading survey"
+            title="Error loading surveys"
             message={error}
-            onRetry={loadResults}
+            onRetry={refresh}
           />
         ) : !results ? (
-          <AdminEmptyState icon={ClipboardList} title="No surveys defined" />
+          <AdminEmptyState icon={ClipboardList} title="No surveys yet" />
         ) : (
           <>
             <AdminStatCards
@@ -258,22 +467,23 @@ export default function AdminSurveys() {
                   value: results.survey.active ? 'Active' : 'Inactive',
                   sub: results.survey.active
                     ? 'Shown to every logged-in user who has not answered'
-                    : 'Not shown to anyone',
+                    : activeSurvey
+                      ? `"${activeSurvey.title}" is active`
+                      : 'No survey is active',
                 },
                 { label: 'Questions', value: questions.length },
               ]}
             />
 
-            <section className="grid gap-3">
+            <section className="grid gap-4">
               <h2 className="text-sm font-medium">Results per question</h2>
-              <div className="grid gap-3 lg:grid-cols-3">
+              <div className="grid gap-x-8 gap-y-6 lg:grid-cols-3">
                 {questions.map((q, i) => {
-                  const yesPct = pct(q.yes, q.yes + q.no);
+                  const answered = q.yes + q.no;
+                  const yesPct = pct(q.yes, answered);
+                  const noPct = answered > 0 ? 100 - yesPct : 0;
                   return (
-                    <div
-                      key={q.id}
-                      className="grid gap-3 rounded-3xl border-2 border-zinc-800 bg-zinc-900 p-4"
-                    >
+                    <div key={q.id} className="grid content-start gap-3">
                       <p className="text-sm text-zinc-300">
                         <span className="text-zinc-500 tabular-nums">
                           {i + 1}.
@@ -291,9 +501,7 @@ export default function AdminSurveys() {
                         />
                         <div
                           className="h-full bg-red-600"
-                          style={{
-                            width: `${q.yes + q.no > 0 ? 100 - yesPct : 0}%`,
-                          }}
+                          style={{ width: `${noPct}%` }}
                         />
                       </div>
                       <div className="flex items-center justify-between text-xs tabular-nums">
@@ -303,8 +511,7 @@ export default function AdminSurveys() {
                         </span>
                         <span className="inline-flex items-center gap-1 text-red-500">
                           <X className="size-3.5" aria-hidden />
-                          No {q.no.toLocaleString()} (
-                          {q.yes + q.no > 0 ? 100 - yesPct : 0}%)
+                          No {q.no.toLocaleString()} ({noPct}%)
                         </span>
                       </div>
                     </div>
@@ -314,41 +521,37 @@ export default function AdminSurveys() {
             </section>
 
             {results.combinations.length > 0 ? (
-              <section className="grid gap-3">
+              <section className="grid gap-2">
                 <h2 className="text-sm font-medium">Answer combinations</h2>
-                <div className="overflow-x-auto rounded-3xl border-2 border-zinc-800 bg-zinc-900">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left">
-                        {questions.map((q, i) => (
-                          <th key={q.id} className="px-4 py-2.5 font-normal">
-                            <QuestionTag index={i} text={q.text} />
-                          </th>
-                        ))}
-                        <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
-                          Users
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.combinations.map((c) => (
-                        <tr key={JSON.stringify(c.answers)}>
-                          {questions.map((q) => (
-                            <td key={q.id} className="px-4 py-2">
-                              <Answer value={c.answers[q.id]} />
-                            </td>
-                          ))}
-                          <td className="px-4 py-2 text-right text-zinc-300 tabular-nums">
-                            {c.count.toLocaleString()}{' '}
-                            <span className="text-muted-foreground">
-                              ({pct(c.count, totalResponses)}%)
-                            </span>
-                          </td>
-                        </tr>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      {questions.map((q, i) => (
+                        <TableHead key={q.id}>
+                          <QuestionTag index={i} text={q.text} />
+                        </TableHead>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                      <TableHead className="text-right">Users</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {results.combinations.map((c) => (
+                      <TableRow key={JSON.stringify(c.answers)}>
+                        {questions.map((q) => (
+                          <TableCell key={q.id}>
+                            <Answer value={c.answers[q.id]} />
+                          </TableCell>
+                        ))}
+                        <TableCell className="text-right tabular-nums">
+                          {c.count.toLocaleString()}{' '}
+                          <span className="text-muted-foreground">
+                            ({pct(c.count, totalResponses)}%)
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </section>
             ) : null}
 
@@ -376,65 +579,66 @@ export default function AdminSurveys() {
                 />
               ) : (
                 <>
-                  <div className="grid gap-2">
-                    {responses.map((r) => (
-                      <div
-                        key={r.userId}
-                        className="flex flex-col gap-3 rounded-3xl border-2 border-zinc-800 bg-zinc-900 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-800/60 sm:flex-row sm:items-center"
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <Avatar>
-                            {r.avatar ? (
-                              <AvatarImage
-                                src={`https://cdn.discordapp.com/avatars/${r.userId}/${r.avatar}.png`}
-                                alt={r.username}
-                              />
-                            ) : null}
-                            <AvatarFallback>
-                              <UserRound className="size-4 text-zinc-500" />
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {r.username}
-                            </p>
-                            <p className="truncate font-mono text-xs text-zinc-500">
-                              {r.userId}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                          {questions.map((q, i) => (
-                            <span
-                              key={q.id}
-                              className="inline-flex items-center gap-1.5"
-                            >
-                              <QuestionTag index={i} text={q.text} />
+                  <AdminTable className="hidden md:block" minWidth="720px">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        {questions.map((q, i) => (
+                          <TableHead key={q.id}>
+                            <QuestionTag index={i} text={q.text} />
+                          </TableHead>
+                        ))}
+                        <TableHead>Submitted</TableHead>
+                        <TableHead className="text-right">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {responses.map((r) => (
+                        <TableRow key={r.userId}>
+                          <TableCell>
+                            <UserCell r={r} />
+                          </TableCell>
+                          {questions.map((q) => (
+                            <TableCell key={q.id}>
                               <Answer value={r.answers[q.id]} />
-                            </span>
+                            </TableCell>
                           ))}
-                        </div>
-                        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
-                          <span className="text-xs text-zinc-500 tabular-nums">
+                          <TableCell className="text-muted-foreground tabular-nums">
                             {new Date(r.createdAt).toLocaleString()}
-                          </span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => void handleReset(r)}
-                                className="cursor-pointer text-destructive hover:text-destructive"
-                                aria-label={`Reset ${r.username}'s answers`}
-                              >
-                                <RotateCcw />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="shadcn-scope">
-                              Reset answers
-                            </TooltipContent>
-                          </Tooltip>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderReset(r)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </AdminTable>
+
+                  <div className="divide-y rounded-2xl border md:hidden">
+                    {responses.map((r) => (
+                      <div key={r.userId} className="grid gap-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <UserCell r={r} />
+                          {renderReset(r)}
                         </div>
+                        <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
+                          {questions.map((q, i) => (
+                            <div key={q.id} className="contents">
+                              <dt>
+                                <QuestionTag index={i} text={q.text} />
+                              </dt>
+                              <dd>
+                                <Answer value={r.answers[q.id]} />
+                              </dd>
+                            </div>
+                          ))}
+                          <dt className="text-muted-foreground">Submitted</dt>
+                          <dd className="tabular-nums">
+                            {new Date(r.createdAt).toLocaleString()}
+                          </dd>
+                        </dl>
                       </div>
                     ))}
                   </div>
@@ -471,6 +675,15 @@ export default function AdminSurveys() {
           </>
         )}
       </AdminPage>
+
+      <AdminSurveyEditor
+        open={editor !== null}
+        mode={editor?.mode ?? 'create'}
+        initial={editor?.mode === 'edit' ? editor.initial : undefined}
+        responseCount={editor?.mode === 'edit' ? editor.responseCount : 0}
+        onClose={() => setEditor(null)}
+        onSave={handleSave}
+      />
       {confirmDialog}
     </AdminLayout>
   );
