@@ -10,6 +10,7 @@ import {
   ensureDeveloperApiUsageBodyColumns,
   ensureUserHistoryColumns,
   ensureAppSettingsChannelColumn,
+  ensureFeedbackBannerColumn,
   ensureTesterSettingsChannelColumn,
   ensureEventModeColumns,
   ensureFlightReqColumns,
@@ -91,6 +92,7 @@ try {
   await ensureAppSettingsChannelColumn();
   await ensureTesterSettingsChannelColumn();
   await ensureEventModeColumns();
+  await ensureFeedbackBannerColumn();
   await ensureFlightReqColumns();
   await ensureFlightRobloxUsernameColumn();
   await ensureFlightRobloxLinkedColumn();

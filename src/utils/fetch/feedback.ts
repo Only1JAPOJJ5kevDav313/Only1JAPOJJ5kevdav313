@@ -109,3 +109,26 @@ export async function deleteFeedback(id: number): Promise<Feedback> {
 
   return res.json();
 }
+
+export async function fetchFeedbackBannerEnabled(): Promise<boolean> {
+  const res = await apiFetch(`${API_BASE_URL}/api/admin/feedback/banner`, {
+    credentials: 'include',
+  });
+  if (!res.ok) await apiError(res, 'Failed to load feedback banner setting');
+  const data = (await res.json()) as { enabled: boolean };
+  return data.enabled;
+}
+
+export async function setFeedbackBannerEnabled(
+  enabled: boolean
+): Promise<boolean> {
+  const res = await apiFetch(`${API_BASE_URL}/api/admin/feedback/banner`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) await apiError(res, 'Failed to update feedback banner setting');
+  const data = (await res.json()) as { enabled: boolean };
+  return data.enabled;
+}

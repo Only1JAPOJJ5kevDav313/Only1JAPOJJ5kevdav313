@@ -3,8 +3,16 @@ import { AlertTriangle } from 'lucide-react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 
-export default function CanaryModal() {
+export default function CanaryModal({
+  onOpenChange,
+}: {
+  onOpenChange?: (open: boolean) => void;
+}) {
   const [showEarlyReleaseModal, setShowEarlyReleaseModal] = useState(false);
+
+  useEffect(() => {
+    onOpenChange?.(showEarlyReleaseModal);
+  }, [showEarlyReleaseModal, onOpenChange]);
 
   const isEarlyReleaseVersion = () => {
     return (

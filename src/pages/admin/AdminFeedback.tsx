@@ -13,6 +13,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import AdminPage from '../../components/admin/AdminPage';
 import AdminSelect from '../../components/admin/AdminSelect';
 import AdminStatCards from '../../components/admin/AdminStatCards';
+import AdminToggleSwitch from '../../components/admin/AdminToggleSwitch';
 import AdminToolbar from '../../components/admin/AdminToolbar';
 import AdminSearchInput from '../../components/admin/AdminSearchInput';
 import {
@@ -26,6 +27,8 @@ import {
   fetchFeedback,
   fetchFeedbackStats,
   deleteFeedback,
+  fetchFeedbackBannerEnabled,
+  setFeedbackBannerEnabled,
   type Feedback,
   type FeedbackStats,
 } from '../../utils/fetch/feedback';
@@ -83,6 +86,40 @@ export default function AdminFeedback() {
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const { confirm, confirmDialog } = useAdminConfirm();
+  const [bannerEnabled, setBannerEnabled] = useState<boolean | null>(null);
+  const [bannerSaving, setBannerSaving] = useState(false);
+
+  useEffect(() => {
+    fetchFeedbackBannerEnabled()
+      .then(setBannerEnabled)
+      .catch((err) =>
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load feedback banner setting'
+        )
+      );
+  }, []);
+
+  const toggleBanner = async () => {
+    if (bannerEnabled === null) return;
+    setBannerSaving(true);
+    try {
+      const next = await setFeedbackBannerEnabled(!bannerEnabled);
+      setBannerEnabled(next);
+      toast.success(
+        next ? 'Feedback banner enabled' : 'Feedback banner disabled'
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update feedback banner setting'
+      );
+    } finally {
+      setBannerSaving(false);
+    }
+  };
 
   const filterOptions = [
     { value: 'all', label: 'All ratings' },
@@ -238,6 +275,15 @@ export default function AdminFeedback() {
             <MessageSquareText />
             With text
           </Toggle>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground sm:ml-auto">
+            Feedback banner
+            <AdminToggleSwitch
+              checked={bannerEnabled ?? false}
+              onChange={() => void toggleBanner()}
+              disabled={bannerEnabled === null || bannerSaving}
+              aria-label="Show the feedback banner to users"
+            />
+          </label>
         </AdminToolbar>
 
         {feedbackStats && (

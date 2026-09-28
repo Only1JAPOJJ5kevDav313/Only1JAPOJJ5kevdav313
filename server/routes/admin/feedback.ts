@@ -8,6 +8,7 @@ import {
   getFeedbackStats,
 } from '../../db/feedback.js';
 import { getClientIp } from '../../utils/getIpAddress.js';
+import { getSiteSettings, updateSiteSettings } from '../../db/siteSettings.js';
 
 const router = express.Router();
 
@@ -61,6 +62,38 @@ router.get('/stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch feedback stats' });
   }
 });
+
+router.get('/banner', async (_req, res) => {
+  try {
+    const { feedbackBannerEnabled } = await getSiteSettings();
+    res.json({ enabled: feedbackBannerEnabled });
+  } catch (error) {
+    console.error('Error fetching feedback banner setting:', error);
+    res.status(500).json({ error: 'Failed to fetch feedback banner setting' });
+  }
+});
+
+router.patch(
+  '/banner',
+  createAuditLogger('FEEDBACK_BANNER_UPDATED'),
+  async (req, res) => {
+    try {
+      const { enabled } = req.body ?? {};
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'enabled must be a boolean' });
+      }
+      const { feedbackBannerEnabled } = await updateSiteSettings({
+        feedbackBannerEnabled: enabled,
+      });
+      res.json({ enabled: feedbackBannerEnabled });
+    } catch (error) {
+      console.error('Error updating feedback banner setting:', error);
+      res
+        .status(500)
+        .json({ error: 'Failed to update feedback banner setting' });
+    }
+  }
+);
 
 // DELETE: /api/admin/feedback/:id - Delete feedback
 router.delete('/:id', async (req, res) => {

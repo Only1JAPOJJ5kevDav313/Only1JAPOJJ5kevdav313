@@ -25,6 +25,7 @@ import databaseRouter from './database.js';
 import featuredFlightsRouter from './featuredFlights.js';
 import userAlertsRouter from './userAlerts.js';
 import profileContentRouter from './profileContent.js';
+import surveysRouter from './surveys.js';
 
 const router = express.Router();
 
@@ -50,6 +51,7 @@ router.use('/database', databaseRouter);
 router.use('/featured-flights', featuredFlightsRouter);
 router.use('/user-alerts', userAlertsRouter);
 router.use('/profile-content', profileContentRouter);
+router.use('/surveys', surveysRouter);
 
 // GET: /api/admin/statistics/forecast - 30-day activity forecast
 router.get(
