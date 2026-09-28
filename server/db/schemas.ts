@@ -226,6 +226,25 @@ export async function createMainTables() {
     .column('user_id')
     .execute();
 
+  // survey_responses
+  await mainDb.schema
+    .createTable('survey_responses')
+    .ifNotExists()
+    .addColumn('id', 'bigserial', (col) => col.primaryKey())
+    .addColumn('survey_id', 'varchar(64)', (col) => col.notNull())
+    .addColumn('user_id', 'varchar(255)', (col) =>
+      col.references('users.id').onDelete('cascade').notNull()
+    )
+    .addColumn('answers', 'jsonb', (col) => col.notNull())
+    .addColumn('created_at', 'timestamptz', (col) =>
+      col.notNull().defaultTo('now()')
+    )
+    .addUniqueConstraint('survey_responses_survey_user_unique', [
+      'survey_id',
+      'user_id',
+    ])
+    .execute();
+
   // testers
   await mainDb.schema
     .createTable('testers')
