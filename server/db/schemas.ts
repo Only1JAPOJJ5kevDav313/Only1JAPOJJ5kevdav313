@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { mainDb } from './connection.js';
 import type Redis from 'ioredis';
 import { DEPLOYMENT, prefixKey } from '../utils/cacheTtl.js';
+import { SEED_SURVEYS } from '../surveys/definitions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -225,6 +226,30 @@ export async function createMainTables() {
     .on('user_notifications')
     .column('user_id')
     .execute();
+
+  // surveys
+  await mainDb.schema
+    .createTable('surveys')
+    .ifNotExists()
+    .addColumn('id', 'varchar(64)', (col) => col.primaryKey())
+    .addColumn('title', 'varchar(120)', (col) => col.notNull())
+    .addColumn('description', 'text', (col) => col.notNull().defaultTo(''))
+    .addColumn('questions', 'jsonb', (col) => col.notNull())
+    .addColumn('active', 'boolean', (col) => col.notNull().defaultTo(false))
+    .addColumn('created_by', 'varchar(255)')
+    .addColumn('created_at', 'timestamptz', (col) =>
+      col.notNull().defaultTo('now()')
+    )
+    .addColumn('updated_at', 'timestamptz', (col) =>
+      col.notNull().defaultTo('now()')
+    )
+    .execute();
+
+  // At most one survey can be active.
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_surveys_single_active
+    ON surveys (active) WHERE active
+  `.execute(mainDb);
 
   // survey_responses
   await mainDb.schema
@@ -918,6 +943,28 @@ export async function ensureEventModeColumns() {
     ALTER TABLE app_settings
     ADD COLUMN IF NOT EXISTS aatc_event_mode boolean NOT NULL DEFAULT false
   `.execute(mainDb);
+}
+
+export async function ensureSurveySeed() {
+  const existing = await mainDb
+    .selectFrom('surveys')
+    .select('id')
+    .limit(1)
+    .executeTakeFirst();
+  if (existing) return;
+  for (const s of SEED_SURVEYS) {
+    await mainDb
+      .insertInto('surveys')
+      .values({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        questions: sql`CAST(${JSON.stringify(s.questions)} AS jsonb)`,
+        active: s.active,
+      })
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
+  }
 }
 
 export async function ensureFeedbackBannerColumn() {

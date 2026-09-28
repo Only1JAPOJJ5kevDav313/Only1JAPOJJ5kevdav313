@@ -22,18 +22,20 @@ vi.mock('../../../server/middleware/auth.js', () => ({
 }));
 
 vi.mock('../../../server/db/surveys.js', () => ({
+  getActiveSurvey: vi.fn(),
   hasSurveyResponse: vi.fn(),
   insertSurveyResponse: vi.fn(),
 }));
 
 import {
+  getActiveSurvey,
   hasSurveyResponse,
   insertSurveyResponse,
 } from '../../../server/db/surveys.js';
-import { getActiveSurvey } from '../../../server/surveys/definitions.js';
+import { SEED_SURVEYS } from '../../../server/surveys/definitions.js';
 import surveysRouter from '../../../server/routes/surveys.js';
 
-const survey = getActiveSurvey()!;
+const survey = SEED_SURVEYS[0];
 type ActiveBody = { survey: { id: string; questions: unknown[] } | null };
 const allYes = Object.fromEntries(survey.questions.map((q) => [q.id, true]));
 
@@ -45,6 +47,18 @@ describe('surveys routes', () => {
   beforeEach(() => {
     vi.mocked(hasSurveyResponse).mockReset();
     vi.mocked(insertSurveyResponse).mockReset();
+    vi.mocked(getActiveSurvey).mockResolvedValue({
+      ...survey,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  });
+
+  it('returns null when no survey is active', async () => {
+    vi.mocked(getActiveSurvey).mockResolvedValue(null);
+    const res = await appRequest(app, 'GET', '/active');
+    expect((res.body as ActiveBody).survey).toBeNull();
+    expect(hasSurveyResponse).not.toHaveBeenCalled();
   });
 
   it('returns the active survey to a user who has not answered', async () => {

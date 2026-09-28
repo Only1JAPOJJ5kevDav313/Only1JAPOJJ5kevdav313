@@ -1,17 +1,17 @@
 import express from 'express';
 import requireAuth from '../middleware/auth.js';
+import { publicSurvey, validateSurveyAnswers } from '../surveys/definitions.js';
 import {
   getActiveSurvey,
-  publicSurvey,
-  validateSurveyAnswers,
-} from '../surveys/definitions.js';
-import { hasSurveyResponse, insertSurveyResponse } from '../db/surveys.js';
+  hasSurveyResponse,
+  insertSurveyResponse,
+} from '../db/surveys.js';
 
 const router = express.Router();
 
 router.get('/active', requireAuth, async (req, res) => {
   try {
-    const survey = getActiveSurvey();
+    const survey = await getActiveSurvey();
     if (!survey || (await hasSurveyResponse(survey.id, req.user!.userId))) {
       return res.json({ survey: null });
     }
@@ -24,7 +24,7 @@ router.get('/active', requireAuth, async (req, res) => {
 
 router.post('/:surveyId/responses', requireAuth, async (req, res) => {
   try {
-    const survey = getActiveSurvey();
+    const survey = await getActiveSurvey();
     if (!survey || survey.id !== req.params.surveyId) {
       return res.status(404).json({ error: 'Survey not found' });
     }
