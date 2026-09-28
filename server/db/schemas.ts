@@ -920,6 +920,13 @@ export async function ensureEventModeColumns() {
   `.execute(mainDb);
 }
 
+export async function ensureFeedbackBannerColumn() {
+  await sql`
+    ALTER TABLE app_settings
+    ADD COLUMN IF NOT EXISTS feedback_banner_enabled boolean NOT NULL DEFAULT false
+  `.execute(mainDb);
+}
+
 export async function ensureFlightReqColumns() {
   await sql`
     ALTER TABLE flights

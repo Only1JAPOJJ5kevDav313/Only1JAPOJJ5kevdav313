@@ -8,4 +8,5 @@ export interface AppSettingsTable {
   channel: string;
   pfatc_event_mode: boolean | null;
   aatc_event_mode: boolean | null;
+  feedback_banner_enabled: Generated<boolean>;
 }

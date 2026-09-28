@@ -20,6 +20,7 @@ import type { Notification as AdminNotification } from '../utils/fetch/admin';
 import CustomUserButton from './tools/UserButton';
 import Button from './common/Button';
 import FeedbackBanner from './tools/FeedbackBanner';
+import { fetchSiteSettings } from '../utils/fetch/siteSettings';
 
 type NavbarProps = {
   sessionId?: string;
@@ -52,6 +53,20 @@ export default function Navbar({
   const [hostname, setHostname] = useState<string>('');
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showFeedbackBanner, setShowFeedbackBanner] = useState(false);
+  const [feedbackBannerEnabled, setFeedbackBannerEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetchSiteSettings()
+      .then((s) => {
+        if (!cancelled) setFeedbackBannerEnabled(s.feedbackBannerEnabled);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     setUtcTime(new Date().toISOString().slice(11, 19));
@@ -72,13 +87,16 @@ export default function Navbar({
       const feedbackDismissed = cookies['feedback_dismissed'] === 'true';
       const hasNotifications = filteredNotifications.length > 0;
       const shouldShow =
-        !hasNotifications && !feedbackSubmitted && !feedbackDismissed;
+        feedbackBannerEnabled &&
+        !hasNotifications &&
+        !feedbackSubmitted &&
+        !feedbackDismissed;
 
       setShowFeedbackBanner(shouldShow);
     };
 
     checkFeedbackCookies();
-  }, [filteredNotifications.length]);
+  }, [filteredNotifications.length, feedbackBannerEnabled]);
 
   useLayoutEffect(() => {
     const handleResize = () => {
