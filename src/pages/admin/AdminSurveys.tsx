@@ -53,6 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Tooltip,
   TooltipContent,
@@ -124,6 +125,13 @@ function pct(part: number, total: number) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
+function formatDuration(ms: number | null) {
+  if (ms == null) return '—';
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 type EditorState =
   | { mode: 'create' }
   | { mode: 'edit'; initial: AdminSurveyInput; responseCount: number }
@@ -145,6 +153,7 @@ export default function AdminSurveys() {
   const [total, setTotal] = useState(0);
   const [editor, setEditor] = useState<EditorState>(null);
   const [activeBusy, setActiveBusy] = useState(false);
+  const [weighted, setWeighted] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirm();
 
   useEffect(() => {
@@ -456,7 +465,7 @@ export default function AdminSurveys() {
         ) : (
           <>
             <AdminStatCards
-              columns={3}
+              columns={4}
               items={[
                 {
                   label: 'Responses',
@@ -472,16 +481,58 @@ export default function AdminSurveys() {
                       : 'No survey is active',
                 },
                 { label: 'Questions', value: questions.length },
+                {
+                  label: 'Median time',
+                  value: formatDuration(results.timing.medianDurationMs),
+                  sub:
+                    results.timing.timedResponses === 0
+                      ? 'No timed responses yet'
+                      : `${results.timing.reducedWeightResponses.toLocaleString()} fast response${results.timing.reducedWeightResponses === 1 ? '' : 's'} weighted down`,
+                },
               ]}
             />
 
             <section className="grid gap-4">
-              <h2 className="text-sm font-medium">Results per question</h2>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="grid gap-1">
+                  <h2 className="text-sm font-medium">Results per question</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Weighted results count surveys finished faster than{' '}
+                    {(results.timing.fullWeightMsPerQuestion / 1000).toFixed(1)}
+                    s per question less, down to 10% at instant clicks.
+                  </p>
+                </div>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={weighted ? 'weighted' : 'normal'}
+                  onValueChange={(v) => {
+                    if (v) setWeighted(v === 'weighted');
+                  }}
+                  aria-label="Result view"
+                >
+                  <ToggleGroupItem value="normal" className="px-3">
+                    Normal
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="weighted" className="px-3">
+                    Weighted
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
               <div className="grid gap-x-8 gap-y-6 lg:grid-cols-3">
                 {questions.map((q, i) => {
-                  const answered = q.yes + q.no;
-                  const yesPct = pct(q.yes, answered);
+                  const yes = weighted ? q.weightedYes : q.yes;
+                  const no = weighted ? q.weightedNo : q.no;
+                  const answered = yes + no;
+                  const yesPct = pct(yes, answered);
                   const noPct = answered > 0 ? 100 - yesPct : 0;
+                  const count = (n: number) =>
+                    weighted
+                      ? n.toLocaleString(undefined, {
+                          maximumFractionDigits: 1,
+                        })
+                      : n.toLocaleString();
                   return (
                     <div key={q.id} className="grid content-start gap-3">
                       <p className="text-sm text-zinc-300">
@@ -493,7 +544,7 @@ export default function AdminSurveys() {
                       <div
                         className="flex h-2.5 overflow-hidden rounded-full bg-zinc-800"
                         role="img"
-                        aria-label={`${q.yes} yes, ${q.no} no`}
+                        aria-label={`${count(yes)} yes, ${count(no)} no`}
                       >
                         <div
                           className="h-full bg-green-600"
@@ -507,11 +558,11 @@ export default function AdminSurveys() {
                       <div className="flex items-center justify-between text-xs tabular-nums">
                         <span className="inline-flex items-center gap-1 text-green-500">
                           <Check className="size-3.5" aria-hidden />
-                          Yes {q.yes.toLocaleString()} ({yesPct}%)
+                          Yes {count(yes)} ({yesPct}%)
                         </span>
                         <span className="inline-flex items-center gap-1 text-red-500">
                           <X className="size-3.5" aria-hidden />
-                          No {q.no.toLocaleString()} ({noPct}%)
+                          No {count(no)} ({noPct}%)
                         </span>
                       </div>
                     </div>
@@ -588,6 +639,7 @@ export default function AdminSurveys() {
                             <QuestionTag index={i} text={q.text} />
                           </TableHead>
                         ))}
+                        <TableHead className="text-right">Time</TableHead>
                         <TableHead>Submitted</TableHead>
                         <TableHead className="text-right">
                           <span className="sr-only">Actions</span>
@@ -605,6 +657,9 @@ export default function AdminSurveys() {
                               <Answer value={r.answers[q.id]} />
                             </TableCell>
                           ))}
+                          <TableCell className="text-right tabular-nums">
+                            {formatDuration(r.durationMs)}
+                          </TableCell>
                           <TableCell className="text-muted-foreground tabular-nums">
                             {new Date(r.createdAt).toLocaleString()}
                           </TableCell>
@@ -634,6 +689,10 @@ export default function AdminSurveys() {
                               </dd>
                             </div>
                           ))}
+                          <dt className="text-muted-foreground">Time</dt>
+                          <dd className="tabular-nums">
+                            {formatDuration(r.durationMs)}
+                          </dd>
                           <dt className="text-muted-foreground">Submitted</dt>
                           <dd className="tabular-nums">
                             {new Date(r.createdAt).toLocaleString()}
