@@ -11,7 +11,6 @@ interface AirportDropdownProps {
   className?: string;
   excludeCenterPositions?: boolean;
   searchable?: boolean;
-  portal?: boolean;
   placeholder?: string;
 }
 
@@ -24,7 +23,6 @@ export default function AirportDropdown({
   className,
   excludeCenterPositions = true,
   searchable = false,
-  portal = false,
   placeholder,
 }: AirportDropdownProps) {
   const { airports, loading } = useData();
@@ -74,7 +72,6 @@ export default function AirportDropdown({
       size={size}
       className={className}
       searchable={searchable}
-      portal={portal}
     />
   );
 }

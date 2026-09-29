@@ -312,7 +312,6 @@ export default function FlightDetailsModal({
                   size="sm"
                   showFullName={false}
                   searchable
-                  portal
                   placeholder="Airport"
                 />
               </div>
@@ -387,7 +386,6 @@ export default function FlightDetailsModal({
               size="sm"
               showFullName={false}
               searchable
-              portal
             />
           </div>
 

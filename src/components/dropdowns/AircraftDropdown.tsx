@@ -9,7 +9,6 @@ interface AircraftDropdownProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
   showFullName?: boolean;
   searchable?: boolean;
-  portal?: boolean;
 }
 
 export default function AircraftDropdown({
@@ -19,7 +18,6 @@ export default function AircraftDropdown({
   size = 'md',
   showFullName = true,
   searchable = false,
-  portal = false,
 }: AircraftDropdownProps) {
   const { aircrafts, loading } = useData();
 
@@ -61,7 +59,6 @@ export default function AircraftDropdown({
       getDisplayValue={getDisplayValue}
       size={size}
       searchable={searchable}
-      portal={portal}
     />
   );
 }
