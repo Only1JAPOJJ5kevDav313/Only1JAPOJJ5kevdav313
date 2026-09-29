@@ -26,7 +26,6 @@ interface DropdownProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
   id?: string;
   searchable?: boolean;
-  portal?: boolean;
 }
 
 const sizeClasses = {
@@ -104,7 +103,6 @@ function Dropdown({
   size = 'md',
   id,
   searchable = false,
-  portal = false,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [panelAbove, setPanelAbove] = useState(false);
@@ -145,11 +143,10 @@ function Dropdown({
     );
   }, [options, searchable, isOpen, inputValue]);
 
-  const trackSide = searchable && portal;
   const setPanelRef = useCallback(
     (node: HTMLDivElement | null) => {
       dropdownRef.current = node;
-      if (!node || !trackSide) return;
+      if (!node || !searchable) return;
       const sync = () =>
         setPanelAbove(node.getAttribute('data-side') === 'top');
       sync();
@@ -164,7 +161,7 @@ function Dropdown({
         setPanelAbove(false);
       };
     },
-    [trackSide]
+    [searchable]
   );
 
   const openFromInput = () => {
@@ -303,29 +300,24 @@ function Dropdown({
         side="bottom"
         align="start"
         sideOffset={0}
-        avoidCollisions={portal}
-        updatePositionStrategy={portal ? 'always' : 'optimized'}
+        updatePositionStrategy="always"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
           if (isInTrigger(e.target)) e.preventDefault();
         }}
         onKeyDown={handlePanelKeyDown}
-        className={
-          portal
-            ? `bg-gray-800 border-2 border-blue-600 shadow-2xl outline-none ${
-                panelAbove
-                  ? 'rounded-t-[22px] rounded-b-none border-b-0'
-                  : 'rounded-b-[22px] rounded-t-none border-t-0'
-              }`
-            : 'z-50 bg-gray-800 border-2 border-blue-600 border-t-0 rounded-b-[22px] shadow-2xl outline-none'
-        }
+        className={`bg-gray-800 border-2 border-blue-600 shadow-2xl outline-none ${
+          panelAbove
+            ? 'rounded-t-[22px] rounded-b-none border-b-0'
+            : 'rounded-b-[22px] rounded-t-none border-t-0'
+        }`}
         style={{
           width: 'var(--radix-popover-trigger-width)',
-          ...(portal ? { zIndex: 10000 } : null),
+          zIndex: 10000,
         }}
       >
-        {portal && panelAbove ? (
+        {panelAbove ? (
           <>
             {optionsList}
             {divider}
@@ -339,11 +331,9 @@ function Dropdown({
       </PopoverPrimitive.Content>
     );
 
-    const triggerOpenClass = !portal
-      ? 'rounded-t-[22px] rounded-b-none border-b-0'
-      : panelAbove
-        ? 'rounded-b-[22px] rounded-t-none border-t-transparent'
-        : 'rounded-t-[22px] rounded-b-none border-b-transparent';
+    const triggerOpenClass = panelAbove
+      ? 'rounded-b-[22px] rounded-t-none border-t-transparent'
+      : 'rounded-t-[22px] rounded-b-none border-b-transparent';
 
     const trigger = (
       <div
@@ -383,21 +373,10 @@ function Dropdown({
 
     return (
       <PopoverPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
-        {portal ? (
-          <div className="relative">
-            <PopoverPrimitive.Anchor asChild>{trigger}</PopoverPrimitive.Anchor>
-            {panel && (
-              <PopoverPrimitive.Portal>{panel}</PopoverPrimitive.Portal>
-            )}
-          </div>
-        ) : (
-          <PopoverPrimitive.Anchor asChild>
-            <div className="relative">
-              {trigger}
-              {panel}
-            </div>
-          </PopoverPrimitive.Anchor>
-        )}
+        <div className="relative">
+          <PopoverPrimitive.Anchor asChild>{trigger}</PopoverPrimitive.Anchor>
+          {panel && <PopoverPrimitive.Portal>{panel}</PopoverPrimitive.Portal>}
+        </div>
       </PopoverPrimitive.Root>
     );
   }
