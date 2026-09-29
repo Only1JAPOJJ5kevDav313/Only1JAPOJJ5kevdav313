@@ -45,8 +45,11 @@ export default function DashboardSidebar({
   };
 
   return (
-    <Sidebar collapsible="icon" variant="floating">
-      <SidebarHeader className="border-b border-sidebar-border">
+    <Sidebar
+      collapsible="icon"
+      className="border-r-0! [--sidebar:var(--background)]"
+    >
+      <SidebarHeader className="h-14 justify-center">
         <Link
           to={homePath}
           onClick={closeOnMobile}
